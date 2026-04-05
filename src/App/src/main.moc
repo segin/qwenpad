@@ -1,0 +1,161 @@
+#include <QApplication>
+#include <QMainWindow>
+#include <QMenuBar>
+#include <QMenu>
+#include <QAction>
+#include <QToolBar>
+#include <QStatusBar>
+#include <QKeySequence>
+#include <QTextEdit>
+#include <QFileDialog>
+#include <QMessageBox>
+
+#include <QtGlobal>
+#include <QtCore>
+#include <QtGui>
+#include <QtWidgets>
+
+class NotepadApp : public QMainWindow
+{
+    Q_OBJECT
+
+public:
+    NotepadApp();
+
+private:
+    QTextEdit *textEdit;
+
+    void setupUI();
+    void setupMenu();
+    void setupToolbar();
+};
+
+NotepadApp::NotepadApp()
+    : QMainWindow()
+{
+    textEdit = new QTextEdit();
+    textEdit->setPlaceholderText("Type something...");
+    setupUI();
+}
+
+void NotepadApp::setupUI()
+{
+    setWindowTitle("NotepadApp");
+    resize(800, 600);
+    setMinimumSize(400, 300);
+    setCentralWidget(textEdit);
+}
+
+void NotepadApp::setupMenu()
+{
+    QMenuBar *menubar = this->menuBar();
+
+    QMenu *fileMenu = menubar->addMenu("File");
+    QAction *newAction = new QAction("New", this);
+    newAction->setShortcut(QKeySequence::New);
+    fileMenu->addAction(newAction);
+    fileMenu->addAction("Open");
+    fileMenu->addAction("Save");
+    fileMenu->addSeparator();
+    QAction *exitAction = new QAction("Exit", this);
+    exitAction->setShortcut(QKeySequence::Quit);
+    QObject::connect(exitAction, &QAction::triggered, []() {
+        QApplication::quit();
+    });
+    fileMenu->addAction(exitAction);
+
+    QMenu *editMenu = menubar->addMenu("Edit");
+    QAction *cutAction = new QAction("Cut", this);
+    QAction *copyAction = new QAction("Copy", this);
+    QAction *pasteAction = new QAction("Paste", this);
+    editMenu->addAction(cutAction);
+    editMenu->addAction(copyAction);
+    editMenu->addAction(pasteAction);
+    editMenu->addSeparator();
+    QAction *selectAllAction = new QAction("Select All", this);
+    editMenu->addAction(selectAllAction);
+}
+
+void NotepadApp::setupToolbar()
+{
+    QToolBar *toolbar = this->addToolBar("Main Toolbar");
+    toolbar->setMovable(false);
+}
+
+void NotepadApp::onNew()
+{
+    textEdit->clear();
+    textEdit->setPlaceholderText("Type something...");
+}
+
+void NotepadApp::onOpen()
+{
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        "Open File",
+        "",
+        "Text Files (*.txt);;All Files (*)"
+    );
+
+    if (!fileName.isEmpty()) {
+        QFile file(fileName);
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QTextStream in(&file);
+            textEdit->setText(in.readAll());
+            file.close();
+        }
+    }
+}
+
+void NotepadApp::onSave()
+{
+    QString fileName = QFileDialog::getSaveFileName(
+        this,
+        "Save File",
+        "",
+        "Text Files (*.txt);;All Files (*)"
+    );
+
+    if (!fileName.isEmpty()) {
+        QFile file(fileName);
+        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream out(&file);
+            QTextStream stream(&file);
+            stream << textEdit->toPlainText();
+            file.close();
+        }
+    }
+}
+
+void NotepadApp::onCut()
+{
+    textEdit->cut();
+}
+
+void NotepadApp::onCopy()
+{
+    textEdit->copy();
+}
+
+void NotepadApp::onPaste()
+{
+    textEdit->paste();
+}
+
+void NotepadApp::onselectAll()
+{
+    textEdit->selectAll();
+}
+
+int main(int argc, char *argv[])
+{
+    QApplication app(argc, argv);
+
+    NotepadApp window;
+    window.setupMenu();
+    window.setupToolbar();
+
+    window.show();
+
+    return app.exec();
+}

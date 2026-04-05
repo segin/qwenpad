@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/segin/notepad/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
