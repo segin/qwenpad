@@ -26,9 +26,8 @@ private:
     QAction *wrapAction;
     QAction *lineNumbersAction;
     QAction *fontAction;
-    QAction *undoAction;
+QAction *undoAction;
     QAction *redoAction;
-    QAction *convertCrlfAction;
     QAction *convertLfAction;
     QAction *convertCrAction;
     QTextEdit *editor;

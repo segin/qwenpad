@@ -40,6 +40,7 @@ void NotepadApp::setupUI()
     lineNumberFont.setPointSize(lineNumberFont.pointSize() - 1);
     lineNumberFont.setBold(false);
     editor->installEventFilter(this);
+    connect(editor, &QTextEdit::cursorPositionChanged, this, &NotepadApp::updateLineInfo);
 
     cutAction = new QAction(tr("Cut"), this);
     cutAction->setShortcuts(QKeySequence::Cut);
