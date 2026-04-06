@@ -1,29 +1,36 @@
 cmake_minimum_required(VERSION 3.20)
 
-# Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Set project name
 project(NotepadApp LANGUAGES CXX)
 
-# Find Qt6
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
 
-# Add executable
+set(MOC_SRCS ${CMAKE_CURRENT_BINARY_DIR}/notepadapp_moc.cpp)
+add_custom_command(
+    OUTPUT ${MOC_SRCS}
+    COMMAND /usr/lib/qt6/moc -o ${MOC_SRCS} ${CMAKE_SOURCE_DIR}/src/App/src/notepadapp.h
+    DEPENDS ${CMAKE_SOURCE_DIR}/src/App/src/notepadapp.h
+)
+
 add_executable(NotepadApp
     src/App/src/main.cpp
+    src/App/src/notepadapp.cpp
+    ${MOC_SRCS}
 )
 
-# Link libraries
-target_link_libraries(NotepadApp PRIVATE
-    Qt6::Core
-    Qt6::Gui
-    Qt6::Widgets
+target_include_directories(NotepadApp PRIVATE
+    /usr/include/qt6
+    /usr/include/qt6/QtWidgets
+    /usr/include/qt6/QtGui
+    /usr/include/qt6/QtCore
 )
 
-# Set public methods using compile_definitions with different macro format
+target_link_libraries(NotepadApp PRIVATE Qt6::Core Qt6::Widgets)
+
 target_compile_definitions(NotepadApp PRIVATE
-    PUBLIC_METHODS=setupUI onNew onOpen onSave onCut onCopy onPaste onselectAll
-    PUBLIC_MACRO=setupUI onNew onOpen onSave onCut onCopy onPaste onselectAll
+    QT_CORE_LIB
+    QT_GUI_LIB
+    QT_WIDGETS_LIB
 )
