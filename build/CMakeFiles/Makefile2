@@ -85,12 +85,12 @@ clean: CMakeFiles/NotepadApp.dir/clean
 CMakeFiles/NotepadApp.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/NotepadApp.dir/build.make CMakeFiles/NotepadApp.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/NotepadApp.dir/build.make CMakeFiles/NotepadApp.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/segin/notepad/build/CMakeFiles --progress-num=1,2 "Built target NotepadApp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/segin/notepad/build/CMakeFiles --progress-num=1,2,3,4,5 "Built target NotepadApp"
 .PHONY : CMakeFiles/NotepadApp.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/NotepadApp.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/segin/notepad/build/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/segin/notepad/build/CMakeFiles 5
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/NotepadApp.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/segin/notepad/build/CMakeFiles 0
 .PHONY : CMakeFiles/NotepadApp.dir/rule
@@ -102,7 +102,7 @@ NotepadApp: CMakeFiles/NotepadApp.dir/rule
 # codegen rule for target.
 CMakeFiles/NotepadApp.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/NotepadApp.dir/build.make CMakeFiles/NotepadApp.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/segin/notepad/build/CMakeFiles --progress-num=1,2 "Finished codegen for target NotepadApp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/segin/notepad/build/CMakeFiles --progress-num=1,2,3,4,5 "Finished codegen for target NotepadApp"
 .PHONY : CMakeFiles/NotepadApp.dir/codegen
 
 # clean rule for target.

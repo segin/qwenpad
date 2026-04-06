@@ -8,7 +8,9 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/home/segin/notepad/build/notepadapp_moc.cpp" "CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.o" "gcc" "CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.o.d"
   "/home/segin/notepad/src/App/src/main.cpp" "CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o" "gcc" "CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o.d"
+  "/home/segin/notepad/src/App/src/notepadapp.cpp" "CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.o" "gcc" "CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.o.d"
   "" "NotepadApp" "gcc" "CMakeFiles/NotepadApp.dir/link.d"
   )
 

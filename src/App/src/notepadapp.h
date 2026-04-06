@@ -40,11 +40,12 @@ private slots:
     void onAbout();
     void onWrap();
     void onFont();
+    void setBufferDirty();
 
 private:
     void updateUI();
     bool isBufferDirty() const;
-    void setBufferDirty(bool dirty);
+    void setDirty(bool dirty);
     QString askSave();
 
 protected:

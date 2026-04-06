@@ -69,13 +69,17 @@ include CMakeFiles/NotepadApp.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/NotepadApp.dir/flags.make
 
+notepadapp_moc.cpp: /home/segin/notepad/src/App/src/notepadapp.h
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/segin/notepad/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Generating notepadapp_moc.cpp"
+	/usr/lib/qt6/moc -o /home/segin/notepad/build/notepadapp_moc.cpp /home/segin/notepad/src/App/src/notepadapp.h
+
 CMakeFiles/NotepadApp.dir/codegen:
 .PHONY : CMakeFiles/NotepadApp.dir/codegen
 
 CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o: CMakeFiles/NotepadApp.dir/flags.make
 CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o: /home/segin/notepad/src/App/src/main.cpp
 CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o: CMakeFiles/NotepadApp.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/segin/notepad/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/segin/notepad/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o -MF CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o.d -o CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o -c /home/segin/notepad/src/App/src/main.cpp
 
 CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.i: cmake_force
@@ -86,14 +90,46 @@ CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/segin/notepad/src/App/src/main.cpp -o CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.s
 
+CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.o: CMakeFiles/NotepadApp.dir/flags.make
+CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.o: /home/segin/notepad/src/App/src/notepadapp.cpp
+CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.o: CMakeFiles/NotepadApp.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/segin/notepad/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.o -MF CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.o.d -o CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.o -c /home/segin/notepad/src/App/src/notepadapp.cpp
+
+CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/segin/notepad/src/App/src/notepadapp.cpp > CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.i
+
+CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/segin/notepad/src/App/src/notepadapp.cpp -o CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.s
+
+CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.o: CMakeFiles/NotepadApp.dir/flags.make
+CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.o: notepadapp_moc.cpp
+CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.o: CMakeFiles/NotepadApp.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/segin/notepad/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.o -MF CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.o.d -o CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.o -c /home/segin/notepad/build/notepadapp_moc.cpp
+
+CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/segin/notepad/build/notepadapp_moc.cpp > CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.i
+
+CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/segin/notepad/build/notepadapp_moc.cpp -o CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.s
+
 # Object files for target NotepadApp
 NotepadApp_OBJECTS = \
-"CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o"
+"CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o" \
+"CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.o" \
+"CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.o"
 
 # External object files for target NotepadApp
 NotepadApp_EXTERNAL_OBJECTS =
 
 NotepadApp: CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.o
+NotepadApp: CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.o
+NotepadApp: CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.o
 NotepadApp: CMakeFiles/NotepadApp.dir/build.make
 NotepadApp: CMakeFiles/NotepadApp.dir/compiler_depend.ts
 NotepadApp: /usr/lib/libQt6Widgets.so.6.11.0
@@ -102,7 +138,7 @@ NotepadApp: /usr/lib/libGLX.so
 NotepadApp: /usr/lib/libOpenGL.so
 NotepadApp: /usr/lib/libQt6Core.so.6.11.0
 NotepadApp: CMakeFiles/NotepadApp.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/segin/notepad/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable NotepadApp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/segin/notepad/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Linking CXX executable NotepadApp"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/NotepadApp.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
@@ -113,7 +149,7 @@ CMakeFiles/NotepadApp.dir/clean:
 	$(CMAKE_COMMAND) -P CMakeFiles/NotepadApp.dir/cmake_clean.cmake
 .PHONY : CMakeFiles/NotepadApp.dir/clean
 
-CMakeFiles/NotepadApp.dir/depend:
+CMakeFiles/NotepadApp.dir/depend: notepadapp_moc.cpp
 	cd /home/segin/notepad/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/segin/notepad /home/segin/notepad /home/segin/notepad/build /home/segin/notepad/build /home/segin/notepad/build/CMakeFiles/NotepadApp.dir/DependInfo.cmake "--color=$(COLOR)" NotepadApp
 .PHONY : CMakeFiles/NotepadApp.dir/depend
 

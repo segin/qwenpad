@@ -129,6 +129,30 @@ NotepadApp/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/NotepadApp.dir/build.make CMakeFiles/NotepadApp.dir/build
 .PHONY : NotepadApp/fast
 
+notepadapp_moc.o: notepadapp_moc.cpp.o
+.PHONY : notepadapp_moc.o
+
+# target to build an object file
+notepadapp_moc.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/NotepadApp.dir/build.make CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.o
+.PHONY : notepadapp_moc.cpp.o
+
+notepadapp_moc.i: notepadapp_moc.cpp.i
+.PHONY : notepadapp_moc.i
+
+# target to preprocess a source file
+notepadapp_moc.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/NotepadApp.dir/build.make CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.i
+.PHONY : notepadapp_moc.cpp.i
+
+notepadapp_moc.s: notepadapp_moc.cpp.s
+.PHONY : notepadapp_moc.s
+
+# target to generate assembly for a file
+notepadapp_moc.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/NotepadApp.dir/build.make CMakeFiles/NotepadApp.dir/notepadapp_moc.cpp.s
+.PHONY : notepadapp_moc.cpp.s
+
 src/App/src/main.o: src/App/src/main.cpp.o
 .PHONY : src/App/src/main.o
 
@@ -153,6 +177,30 @@ src/App/src/main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/NotepadApp.dir/build.make CMakeFiles/NotepadApp.dir/src/App/src/main.cpp.s
 .PHONY : src/App/src/main.cpp.s
 
+src/App/src/notepadapp.o: src/App/src/notepadapp.cpp.o
+.PHONY : src/App/src/notepadapp.o
+
+# target to build an object file
+src/App/src/notepadapp.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/NotepadApp.dir/build.make CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.o
+.PHONY : src/App/src/notepadapp.cpp.o
+
+src/App/src/notepadapp.i: src/App/src/notepadapp.cpp.i
+.PHONY : src/App/src/notepadapp.i
+
+# target to preprocess a source file
+src/App/src/notepadapp.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/NotepadApp.dir/build.make CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.i
+.PHONY : src/App/src/notepadapp.cpp.i
+
+src/App/src/notepadapp.s: src/App/src/notepadapp.cpp.s
+.PHONY : src/App/src/notepadapp.s
+
+# target to generate assembly for a file
+src/App/src/notepadapp.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/NotepadApp.dir/build.make CMakeFiles/NotepadApp.dir/src/App/src/notepadapp.cpp.s
+.PHONY : src/App/src/notepadapp.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -162,9 +210,15 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... NotepadApp"
+	@echo "... notepadapp_moc.o"
+	@echo "... notepadapp_moc.i"
+	@echo "... notepadapp_moc.s"
 	@echo "... src/App/src/main.o"
 	@echo "... src/App/src/main.i"
 	@echo "... src/App/src/main.s"
+	@echo "... src/App/src/notepadapp.o"
+	@echo "... src/App/src/notepadapp.i"
+	@echo "... src/App/src/notepadapp.s"
 .PHONY : help
 
 

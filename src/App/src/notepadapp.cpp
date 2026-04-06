@@ -57,7 +57,7 @@ void NotepadApp::setupUI()
     connect(copyAction, SIGNAL(triggered()), editor, SLOT(copy()));
     connect(pasteAction, SIGNAL(triggered()), editor, SLOT(paste()));
     connect(selectAllAction, SIGNAL(triggered()), editor, SLOT(selectAll()));
-    connect(editor, SIGNAL(textChanged()), this, SLOT(setBufferDirty(true)));
+       connect(editor, SIGNAL(textChanged()), this, SLOT(setBufferDirty()));
     connect(aboutAction, SIGNAL(triggered()), this, SLOT(onAbout()));
     connect(quitAction, SIGNAL(triggered()), this, SLOT(close()));
     connect(wrapAction, SIGNAL(triggered()), this, SLOT(onWrap()));
@@ -182,7 +182,7 @@ void NotepadApp::onOpen()
             editor->setPlainText(stream.readAll());
             file.close();
             currentFile = fileName;
-            setBufferDirty(false);
+            setDirty(false);
             setWindowTitle(QFileInfo(fileName).fileName() + " - Notepad");
         }
     }
@@ -198,7 +198,7 @@ void NotepadApp::onSave()
             stream << editor->toPlainText();
             file.close();
             currentFile = fileName;
-            setBufferDirty(false);
+            setDirty(false);
             setWindowTitle(QFileInfo(fileName).fileName() + " - Notepad");
             QMessageBox::information(this, "Save", "File saved successfully");
         }
@@ -260,7 +260,12 @@ bool NotepadApp::isBufferDirty() const
     return bufferDirty;
 }
 
-void NotepadApp::setBufferDirty(bool dirty)
+void NotepadApp::setBufferDirty()
+{
+    setDirty(true);
+}
+
+void NotepadApp::setDirty(bool dirty)
 {
     bufferDirty = dirty;
     QString title = currentFile.isEmpty() ? "Notepad" : QFileInfo(currentFile).fileName();
@@ -302,5 +307,6 @@ void NotepadApp::closeEvent(QCloseEvent *event)
             return;
         }
     }
+    setDirty(false);
     QMainWindow::closeEvent(event);
 }
