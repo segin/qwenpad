@@ -42,16 +42,19 @@ void NotepadApp::setupUI()
     editor->installEventFilter(this);
     connect(editor, &QTextEdit::cursorPositionChanged, this, &NotepadApp::updateLineInfo);
 
-    cutAction = new QAction(tr("Cut"), this);
+    cutAction = new QAction(QIcon::fromTheme("edit-cut"), tr("Cut"), this);
     cutAction->setShortcuts(QKeySequence::Cut);
+    cutAction->setToolTip(tr("Cut"));
     connect(cutAction, &QAction::triggered, editor, &QTextEdit::cut);
 
-    copyAction = new QAction(tr("Copy"), this);
+    copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy"), this);
     copyAction->setShortcuts(QKeySequence::Copy);
+    copyAction->setToolTip(tr("Copy"));
     connect(copyAction, &QAction::triggered, editor, &QTextEdit::copy);
 
-    pasteAction = new QAction(tr("Paste"), this);
+    pasteAction = new QAction(QIcon::fromTheme("edit-paste"), tr("Paste"), this);
     pasteAction->setShortcuts(QKeySequence::Paste);
+    pasteAction->setToolTip(tr("Paste"));
     connect(pasteAction, &QAction::triggered, editor, &QTextEdit::paste);
 
     selectAllAction = new QAction(tr("Select All"), this);
@@ -155,7 +158,7 @@ void NotepadApp::setupUI()
      toolbar->addAction(toolbarSave);
      
      toolbar->addSeparator();
-     // Edit actions
+     // Edit actions with icons only
      toolbar->addAction(cutAction);
      toolbar->addAction(copyAction);
      toolbar->addAction(pasteAction);
