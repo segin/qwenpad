@@ -137,17 +137,29 @@ void NotepadApp::setupUI()
     menubar->addMenu(helpMenu);
     setMenuBar(menubar);
 
-   toolbar->setIconSize(QSize(16, 16));
-    // File actions first with icons
-    toolbar->addAction(new QAction(QIcon::fromTheme("document-new"), tr("New"), this));
-    toolbar->addAction(new QAction(QIcon::fromTheme("document-open"), tr("Open"), this));
-    toolbar->addAction(new QAction(QIcon::fromTheme("document-save"), tr("Save"), this));
-    toolbar->addSeparator();
-    // Edit actions
-    toolbar->addAction(cutAction);
-    toolbar->addAction(copyAction);
-    toolbar->addAction(pasteAction);
-    addToolBar(toolbar);
+ toolbar->setIconSize(QSize(16, 16));
+     // File actions first with icons
+     QAction *toolbarNew = new QAction(QIcon::fromTheme("document-new"), tr("New"), this);
+     toolbarNew->setShortcut(QKeySequence::New);
+     connect(toolbarNew, &QAction::triggered, this, &NotepadApp::onNew);
+     toolbar->addAction(toolbarNew);
+     
+     QAction *toolbarOpen = new QAction(QIcon::fromTheme("document-open"), tr("Open"), this);
+     toolbarOpen->setShortcut(QKeySequence::Open);
+     connect(toolbarOpen, &QAction::triggered, this, &NotepadApp::onOpen);
+     toolbar->addAction(toolbarOpen);
+     
+     QAction *toolbarSave = new QAction(QIcon::fromTheme("document-save"), tr("Save"), this);
+     toolbarSave->setShortcut(QKeySequence::Save);
+     connect(toolbarSave, &QAction::triggered, this, &NotepadApp::onSave);
+     toolbar->addAction(toolbarSave);
+     
+     toolbar->addSeparator();
+     // Edit actions
+     toolbar->addAction(cutAction);
+     toolbar->addAction(copyAction);
+     toolbar->addAction(pasteAction);
+     addToolBar(toolbar);
 
    // Status bar with line info
     setStatusBar(new QStatusBar(this));
