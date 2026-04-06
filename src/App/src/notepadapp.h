@@ -6,12 +6,10 @@
 #include <QToolBar>
 #include <QAction>
 #include <QMenu>
-#include <QPushButton>
 #include <QTextEdit>
 #include <QString>
 #include <QResizeEvent>
 #include <QCloseEvent>
-#include <QKeySequence>
 
 class NotepadApp : public QMainWindow
 {
@@ -20,8 +18,15 @@ class NotepadApp : public QMainWindow
 private:
     QMenuBar *menubar;
     QToolBar *toolbar;
+    QAction *cutAction;
+    QAction *copyAction;
+    QAction *pasteAction;
+    QAction *selectAllAction;
+    QAction *aboutAction;
+    QAction *quitAction;
+    QAction *wrapAction;
+    QAction *fontAction;
     QTextEdit *editor;
-    QAction *cutAction, *copyAction, *pasteAction, *selectAllAction, *aboutAction, *quitAction, *wrapAction, *fontAction;
     QString currentFile;
     bool bufferDirty;
 
@@ -36,15 +41,13 @@ private slots:
     void onCut();
     void onCopy();
     void onPaste();
-    void onselectAll();
+    void onSelectAll();
     void onAbout();
     void onWrap();
     void onFont();
-    void setBufferDirty();
+    void onTextChange();
 
 private:
-    void updateUI();
-    bool isBufferDirty() const;
     void setDirty(bool dirty);
     QString askSave();
 

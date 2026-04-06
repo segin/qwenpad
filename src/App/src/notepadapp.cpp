@@ -9,8 +9,11 @@
 #include <QFontDialog>
 #include <QFontDatabase>
 #include <QIcon>
+#include <QKeySequence>
 
-NotepadApp::NotepadApp(QWidget *parent) : QMainWindow(parent)
+NotepadApp::NotepadApp(QWidget *parent)
+    : QMainWindow(parent)
+    , bufferDirty(false)
 {
     setupUI();
 }
@@ -24,145 +27,104 @@ void NotepadApp::setupUI()
     font.setFamily("Monospace");
     font.setFixedPitch(true);
     editor->setFont(font);
-    bufferDirty = false;
+    setCentralWidget(editor);
 
-   
+    cutAction = new QAction(tr("Cut"), this);
+    cutAction->setShortcuts(QKeySequence::Cut);
+    connect(cutAction, &QAction::triggered, editor, &QTextEdit::cut);
 
-    cutAction = new QAction("Cut", this);
-    copyAction = new QAction("Copy", this);
-    pasteAction = new QAction("Paste", this);
-    selectAllAction = new QAction("Select All", this);
-    aboutAction = new QAction("About", this);
+    copyAction = new QAction(tr("Copy"), this);
+    copyAction->setShortcuts(QKeySequence::Copy);
+    connect(copyAction, &QAction::triggered, editor, &QTextEdit::copy);
+
+    pasteAction = new QAction(tr("Paste"), this);
+    pasteAction->setShortcuts(QKeySequence::Paste);
+    connect(pasteAction, &QAction::triggered, editor, &QTextEdit::paste);
+
+    selectAllAction = new QAction(tr("Select All"), this);
+    selectAllAction->setShortcuts(QKeySequence::SelectAll);
+    connect(selectAllAction, &QAction::triggered, editor, &QTextEdit::selectAll);
+
+    aboutAction = new QAction(tr("About"), this);
     aboutAction->setShortcut(QKeySequence("F1"));
-    quitAction = new QAction("Quit", this);
+    connect(aboutAction, &QAction::triggered, this, &NotepadApp::onAbout);
+
+    quitAction = new QAction(tr("Quit"), this);
     quitAction->setShortcut(QKeySequence("Ctrl+Q"));
-    wrapAction = new QAction("Word Wrap", this);
+    connect(quitAction, &QAction::triggered, this, &QMainWindow::close);
+
+    wrapAction = new QAction(tr("Word Wrap"), this);
     wrapAction->setShortcut(QKeySequence("Ctrl+W"));
     wrapAction->setCheckable(true);
     wrapAction->setChecked(true);
-    fontAction = new QAction("Font...", this);
+    connect(wrapAction, &QAction::triggered, this, &NotepadApp::onWrap);
+
+    fontAction = new QAction(tr("Font..."), this);
     fontAction->setShortcut(QKeySequence("Ctrl+F"));
+    connect(fontAction, &QAction::triggered, this, &NotepadApp::onFont);
 
-    cutAction->setShortcut(QKeySequence::Cut);
-    copyAction->setShortcut(QKeySequence::Copy);
-    pasteAction->setShortcut(QKeySequence::Paste);
-    selectAllAction->setShortcut(QKeySequence::SelectAll);
-
-    connect(cutAction, SIGNAL(triggered()), this, SLOT(onCut()));
-    connect(copyAction, SIGNAL(triggered()), this, SLOT(onCopy()));
-    connect(pasteAction, SIGNAL(triggered()), this, SLOT(onPaste()));
-    connect(selectAllAction, SIGNAL(triggered()), this, SLOT(onselectAll()));
-
-    connect(cutAction, SIGNAL(triggered()), editor, SLOT(cut()));
-    connect(copyAction, SIGNAL(triggered()), editor, SLOT(copy()));
-    connect(pasteAction, SIGNAL(triggered()), editor, SLOT(paste()));
-    connect(selectAllAction, SIGNAL(triggered()), editor, SLOT(selectAll()));
-       connect(editor, SIGNAL(textChanged()), this, SLOT(setBufferDirty()));
-    connect(aboutAction, SIGNAL(triggered()), this, SLOT(onAbout()));
-    connect(quitAction, SIGNAL(triggered()), this, SLOT(close()));
-    connect(wrapAction, SIGNAL(triggered()), this, SLOT(onWrap()));
-    connect(fontAction, SIGNAL(triggered()), this, SLOT(onFont()));
-
-    cutAction->setIcon(QIcon::fromTheme("edit-cut"));
-    copyAction->setIcon(QIcon::fromTheme("edit-copy"));
-    pasteAction->setIcon(QIcon::fromTheme("edit-paste"));
-    
-    QAction *newAction = new QAction("New", this);
-    newAction->setIcon(QIcon::fromTheme("document-new"));
-    newAction->setShortcut(QKeySequence::New);
-    connect(newAction, SIGNAL(triggered()), this, SLOT(onNew()));
-    
-    QAction *openAction = new QAction("Open", this);
-    openAction->setIcon(QIcon::fromTheme("document-open"));
-    openAction->setShortcut(QKeySequence::Open);
-    connect(openAction, SIGNAL(triggered()), this, SLOT(onOpen()));
-    
-    QAction *saveAction = new QAction("Save", this);
-    saveAction->setIcon(QIcon::fromTheme("document-save"));
-    saveAction->setShortcut(QKeySequence::Save);
-    connect(saveAction, SIGNAL(triggered()), this, SLOT(onSave()));
-    
-    toolbar->addAction(newAction);
-    toolbar->addAction(openAction);
-    toolbar->addAction(saveAction);
-    toolbar->addSeparator();
-    toolbar->addAction(cutAction);
-    toolbar->addAction(copyAction);
-    toolbar->addAction(pasteAction);
-
-    QMenu *fileMenu = new QMenu("File", menubar);
-    QAction *fileNew = new QAction("&New", this);
-    fileNew->setShortcut(QKeySequence::New);
-    connect(fileNew, SIGNAL(triggered()), this, SLOT(onNew()));
-    fileMenu->addAction(fileNew);
-    QAction *fileOpen = new QAction("&Open", this);
-    fileOpen->setShortcut(QKeySequence::Open);
-    connect(fileOpen, SIGNAL(triggered()), this, SLOT(onOpen()));
-    fileMenu->addAction(fileOpen);
-    QAction *fileSave = new QAction("&Save", this);
-    fileSave->setShortcut(QKeySequence::Save);
-    connect(fileSave, SIGNAL(triggered()), this, SLOT(onSave()));
-    fileMenu->addAction(fileSave);
+    auto *fileMenu = new QMenu(tr("File"), menubar);
+    fileMenu->addAction(new QAction(tr("&New"), this));
+    fileMenu->addAction(new QAction(tr("&Open"), this));
+    fileMenu->addAction(new QAction(tr("&Save"), this));
     fileMenu->addSeparator();
     fileMenu->addAction(quitAction);
-    
-    QMenu *editMenu = new QMenu("Edit", menubar);
-    QMenu *helpMenu = new QMenu("Help", menubar);
-    QMenu *viewMenu = new QMenu("View", menubar);
 
+    auto *editMenu = new QMenu(tr("Edit"), menubar);
     editMenu->addAction(cutAction);
     editMenu->addAction(copyAction);
     editMenu->addAction(pasteAction);
     editMenu->addAction(selectAllAction);
     editMenu->addSeparator();
-    QAction *undoAction = new QAction("&Undo", this);
-    undoAction->setShortcut(QKeySequence::Undo);
-    undoAction->setEnabled(false);
-    editMenu->addAction(undoAction);
-    QAction *redoAction = new QAction("&Redo", this);
-    redoAction->setShortcut(QKeySequence::Redo);
-    redoAction->setEnabled(false);
-    editMenu->addAction(redoAction);
-    
-    helpMenu->addAction(aboutAction);
-    helpMenu->addSeparator();
-    QAction *docAction = new QAction("&Documentation", this);
-    docAction->setShortcut(QKeySequence("F1"));
-    helpMenu->addAction(docAction);
-    
+    editMenu->addAction(new QAction(tr("&Undo"), this));
+    editMenu->addAction(new QAction(tr("&Redo"), this));
+
+    auto *viewMenu = new QMenu(tr("View"), menubar);
     viewMenu->addAction(wrapAction);
     viewMenu->addSeparator();
     viewMenu->addAction(fontAction);
+
+    auto *helpMenu = new QMenu(tr("Help"), menubar);
+    helpMenu->addAction(aboutAction);
+    helpMenu->addSeparator();
+    helpMenu->addAction(new QAction(tr("&Documentation"), this));
 
     menubar->addMenu(fileMenu);
     menubar->addMenu(editMenu);
     menubar->addMenu(viewMenu);
     menubar->addMenu(helpMenu);
-
     setMenuBar(menubar);
-    addToolBar(toolbar);
-    setCentralWidget(editor);
 
-    statusBar()->showMessage("Notepad v0.1");
+    toolbar->setIconSize(QSize(16, 16));
+    toolbar->addAction(cutAction);
+    toolbar->addAction(copyAction);
+    toolbar->addAction(pasteAction);
+    toolbar->addSeparator();
+    toolbar->addAction(new QAction(tr("New"), this));
+    toolbar->addAction(new QAction(tr("Open"), this));
+    toolbar->addAction(new QAction(tr("Save"), this));
+    addToolBar(toolbar);
+
+    statusBar()->showMessage(tr("Notepad v0.1"));
 }
 
 void NotepadApp::onNew()
 {
     if (bufferDirty) {
-        int reply = QMessageBox::question(this, "New File",
-            "The current file has unsaved changes. Do you really want to create a new file?",
+        int reply = QMessageBox::question(this, tr("New File"),
+            tr("The current file has unsaved changes. Do you really want to create a new file?"),
             QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-        
+
         if (reply == QMessageBox::Save) {
             onSave();
         } else if (reply == QMessageBox::Cancel) {
             return;
         }
     }
-    
+
     editor->clear();
     currentFile.clear();
-    setWindowTitle("Notepad");
+    setDirty(false);
 }
 
 void NotepadApp::onOpen()
@@ -173,8 +135,10 @@ void NotepadApp::onOpen()
             return;
         }
     }
-    
-    QString fileName = QFileDialog::getOpenFileName(this, "Open File", "", "Text Files (*.txt)");
+
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"),
+        QString(), tr("Text Files (*.txt)"));
+
     if (!fileName.isEmpty()) {
         QFile file(fileName);
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -183,14 +147,15 @@ void NotepadApp::onOpen()
             file.close();
             currentFile = fileName;
             setDirty(false);
-            setWindowTitle(QFileInfo(fileName).fileName() + " - Notepad");
         }
     }
 }
 
 void NotepadApp::onSave()
 {
-    QString fileName = QFileDialog::getSaveFileName(this, "Save File", currentFile.isEmpty() ? "" : currentFile, "Text Files (*.txt)");
+    QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"),
+        currentFile.isEmpty() ? QString() : currentFile, tr("Text Files (*.txt)"));
+
     if (!fileName.isEmpty()) {
         QFile file(fileName);
         if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -199,8 +164,7 @@ void NotepadApp::onSave()
             file.close();
             currentFile = fileName;
             setDirty(false);
-            setWindowTitle(QFileInfo(fileName).fileName() + " - Notepad");
-            QMessageBox::information(this, "Save", "File saved successfully");
+            QMessageBox::information(this, tr("Save"), tr("File saved successfully"));
         }
     }
 }
@@ -220,19 +184,21 @@ void NotepadApp::onPaste()
     editor->paste();
 }
 
-void NotepadApp::onselectAll()
+void NotepadApp::onSelectAll()
 {
     editor->selectAll();
 }
 
 void NotepadApp::onAbout()
 {
-    QMessageBox::information(this, "About", "Notepad v0.1");
+    QMessageBox::information(this, tr("About"), tr("Notepad v0.1"));
 }
 
 void NotepadApp::onWrap()
 {
-    QTextOption::WrapMode mode = wrapAction->isChecked() ? QTextOption::WrapMode::WordWrap : QTextOption::WrapMode::NoWrap;
+    QTextOption::WrapMode mode = wrapAction->isChecked()
+        ? QTextOption::WrapMode::WordWrap
+        : QTextOption::WrapMode::NoWrap;
     editor->setWordWrapMode(mode);
 }
 
@@ -245,22 +211,7 @@ void NotepadApp::onFont()
     }
 }
 
-void NotepadApp::updateUI()
-{
-    statusBar()->showMessage("Notepad v1.0");
-}
-
-void NotepadApp::resizeEvent(QResizeEvent *event)
-{
-    QMainWindow::resizeEvent(event);
-}
-
-bool NotepadApp::isBufferDirty() const
-{
-    return bufferDirty;
-}
-
-void NotepadApp::setBufferDirty()
+void NotepadApp::onTextChange()
 {
     setDirty(true);
 }
@@ -268,11 +219,11 @@ void NotepadApp::setBufferDirty()
 void NotepadApp::setDirty(bool dirty)
 {
     bufferDirty = dirty;
-    QString title = currentFile.isEmpty() ? "Notepad" : QFileInfo(currentFile).fileName();
+    QString title = currentFile.isEmpty() ? tr("Notepad") : QFileInfo(currentFile).fileName();
     if (bufferDirty) {
-        title += " *";
+        title += tr(" *");
     }
-    title += " - Notepad";
+    title += tr(" - Notepad");
     setWindowTitle(title);
 }
 
@@ -281,26 +232,31 @@ QString NotepadApp::askSave()
     if (!bufferDirty) {
         return QString();
     }
-    
-    int reply = QMessageBox::question(this, "Save Changes",
-        "The current file has unsaved changes. Do you want to save them?",
+
+    int reply = QMessageBox::question(this, tr("Save Changes"),
+        tr("The current file has unsaved changes. Do you want to save them?"),
         QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-    
+
     if (reply == QMessageBox::Save) {
         onSave();
         return currentFile;
     } else if (reply == QMessageBox::Cancel) {
         return QString();
     }
-    
+
     bufferDirty = false;
-    setWindowTitle(currentFile.isEmpty() ? "Notepad" : QFileInfo(currentFile).fileName() + " - Notepad");
+    setWindowTitle(currentFile.isEmpty() ? tr("Notepad") : QFileInfo(currentFile).fileName() + tr(" - Notepad"));
     return QString();
+}
+
+void NotepadApp::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
 }
 
 void NotepadApp::closeEvent(QCloseEvent *event)
 {
-    if (isBufferDirty()) {
+    if (bufferDirty) {
         QString savedFile = askSave();
         if (savedFile.isEmpty()) {
             event->ignore();
