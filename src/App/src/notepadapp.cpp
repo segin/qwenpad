@@ -17,6 +17,7 @@ NotepadApp::NotepadApp(QWidget *parent)
     , bufferDirty(false)
     , wordWrapEnabled(true)
     , lineNumbersEnabled(false)
+    , currentLineEndingType(0) // 0 = LF
 {
     setupUI();
     editor->installEventFilter(this);
@@ -97,8 +98,17 @@ void NotepadApp::setupUI()
     connect(saveAction, &QAction::triggered, this, &NotepadApp::onSave);
     fileMenu->addAction(saveAction);
 
-    fileMenu->addSeparator();
+ fileMenu->addSeparator();
     fileMenu->addAction(quitAction);
+
+    // Undo/Redo actions with shortcuts
+    undoAction = new QAction(tr("&Undo"), this);
+    undoAction->setShortcut(QKeySequence::Undo);
+    undoAction->setEnabled(false);
+    
+    redoAction = new QAction(tr("&Redo"), this);
+    redoAction->setShortcut(QKeySequence::Redo);
+    redoAction->setEnabled(false);
 
     auto *editMenu = new QMenu(tr("Edit"), menubar);
     editMenu->addAction(cutAction);
@@ -106,8 +116,8 @@ void NotepadApp::setupUI()
     editMenu->addAction(pasteAction);
     editMenu->addAction(selectAllAction);
     editMenu->addSeparator();
-    editMenu->addAction(new QAction(tr("&Undo"), this));
-    editMenu->addAction(new QAction(tr("&Redo"), this));
+    editMenu->addAction(undoAction);
+    editMenu->addAction(redoAction);
 
     auto *viewMenu = new QMenu(tr("View"), menubar);
     viewMenu->addAction(wrapAction);
@@ -126,32 +136,32 @@ void NotepadApp::setupUI()
     menubar->addMenu(helpMenu);
     setMenuBar(menubar);
 
-    toolbar->setIconSize(QSize(16, 16));
+   toolbar->setIconSize(QSize(16, 16));
+    // File actions first with icons
+    toolbar->addAction(new QAction(QIcon::fromTheme("document-new"), tr("New"), this));
+    toolbar->addAction(new QAction(QIcon::fromTheme("document-open"), tr("Open"), this));
+    toolbar->addAction(new QAction(QIcon::fromTheme("document-save"), tr("Save"), this));
+    toolbar->addSeparator();
+    // Edit actions
     toolbar->addAction(cutAction);
     toolbar->addAction(copyAction);
     toolbar->addAction(pasteAction);
-    toolbar->addSeparator();
-    toolbar->addAction(new QAction(tr("New"), this));
-    toolbar->addAction(new QAction(tr("Open"), this));
-    toolbar->addAction(new QAction(tr("Save"), this));
     addToolBar(toolbar);
 
-    // Status bar with line info and CR/LF info
-    statusBar = new QStatusBar(this);
-    setStatusBar(statusBar);
+   // Status bar with line info
+    setStatusBar(new QStatusBar(this));
     lineInfoLabel = new QLabel(tr("Ln 0, Col 0"));
-    crLfInfoLabel = new QLabel(tr("CR/LF (DOS)"));
-    lfInfoLabel = new QLabel(tr("LF (Unix)"));
-    statusBar->addPermanentWidget(lineInfoLabel);
-    statusBar->addPermanentWidget(crLfInfoLabel);
-    statusBar->addPermanentWidget(lfInfoLabel);
+    statusBar()->addPermanentWidget(lineInfoLabel);
     // Connect editor text change to our slot
     connect(editor, &QTextEdit::textChanged, this, &NotepadApp::onTextChange);
+    connect(editor, &QTextEdit::undoAvailable, undoAction, &QAction::setEnabled);
+    connect(editor, &QTextEdit::undoAvailable, redoAction, &QAction::setEnabled);
+    connect(editor, &QTextEdit::redoAvailable, redoAction, &QAction::setEnabled);
 
-    statusBar->showMessage(tr("Notepad v0.1"));
+    statusBar()->showMessage(tr("Notepad v0.1"));
 }
 
-void NotepadApp::onNew()
+  void NotepadApp::onNew()
 {
     if (bufferDirty) {
         int reply = QMessageBox::question(this, tr("New File"),
@@ -160,6 +170,9 @@ void NotepadApp::onNew()
 
         if (reply == QMessageBox::Save) {
             onSave();
+        } else if (reply == QMessageBox::Discard) {
+            bufferDirty = false;
+            setDirty(false);
         } else if (reply == QMessageBox::Cancel) {
             return;
         }
@@ -187,9 +200,13 @@ void NotepadApp::onOpen()
         QFile file(fileName);
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QTextStream stream(&file);
-            editor->setPlainText(stream.readAll());
+            QString content = stream.readAll();
             file.close();
+            editor->setPlainText(content);
             currentFile = fileName;
+            
+            // Detect line endings in opened file
+            detectLineEndings();
             
             // Restore metadata if available
             QSettings settings(fileName + ".meta", QSettings::IniFormat);
@@ -207,6 +224,9 @@ void NotepadApp::onOpen()
                 lineNumbersAction->setChecked(settings.value("LineNumbersEnabled").toBool());
                 onToggleLineNumbers();
             }
+            if (settings.contains("LineEndingType")) {
+                currentLineEndingType = settings.value("LineEndingType").toInt();
+            }
             
             setDirty(false);
         }
@@ -219,18 +239,25 @@ void NotepadApp::onSave()
         currentFile.isEmpty() ? QString() : currentFile, tr("Text Files (*.txt)"));
 
     if (!fileName.isEmpty()) {
+        QString content = editor->toPlainText();
+        
+        // Convert line endings based on current selection
+        content = convertLineEndings(content, currentLineEndingType);
+        
         QFile file(fileName);
         if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
             QTextStream stream(&file);
-            // Save document content
-            stream << editor->toPlainText();
-            // Save metadata (font, line wrap, line numbers)
+            stream << content;
+            file.close();
+            
+            // Save metadata (font, line wrap, line numbers, line endings)
             QSettings settings(fileName + ".meta", QSettings::IniFormat);
             settings.setValue("FontFamily", editor->font().family());
             settings.setValue("FontSize", editor->font().pointSize());
             settings.setValue("WordWrapEnabled", wrapAction->isChecked());
             settings.setValue("LineNumbersEnabled", lineNumbersAction->isChecked());
-            file.close();
+            settings.setValue("LineEndingType", currentLineEndingType);
+            
             currentFile = fileName;
             setDirty(false);
             QMessageBox::information(this, tr("Save"), tr("File saved successfully"));
@@ -284,6 +311,71 @@ void NotepadApp::onFont()
     if (ok) {
         editor->setFont(font);
     }
+}
+
+void NotepadApp::onConvertCrlf()
+{
+    QString content = editor->toPlainText();
+    QString converted = convertLineEndings(content, 1); // 1 = CRLF
+    editor->setPlainText(converted);
+    currentLineEndingType = 1;
+    setDirty(true);
+    detectLineEndings();
+}
+
+void NotepadApp::onConvertLf()
+{
+    QString content = editor->toPlainText();
+    QString converted = convertLineEndings(content, 0); // 0 = LF
+    editor->setPlainText(converted);
+    currentLineEndingType = 0;
+    setDirty(true);
+    detectLineEndings();
+}
+
+void NotepadApp::onConvertCr()
+{
+    QString content = editor->toPlainText();
+    QString converted = convertLineEndings(content, 2); // 2 = CR
+    editor->setPlainText(converted);
+    currentLineEndingType = 2;
+    setDirty(true);
+    detectLineEndings();
+}
+
+void NotepadApp::detectLineEndings()
+{
+    QString content = editor->toPlainText();
+    int crCount = content.count('\r');
+    int lfCount = content.count('\n');
+    int crlfCount = content.count("\r\n");
+    
+    if (crlfCount > crCount - crlfCount) {
+        currentLineEndingType = 1; // CRLF
+    } else if (crCount > lfCount) {
+        currentLineEndingType = 2; // CR
+    } else {
+        currentLineEndingType = 0; // LF
+    }
+}
+
+QString NotepadApp::convertLineEndings(const QString &text, int target)
+{
+    QString result = text;
+    
+    switch (target) {
+        case 0: // LF
+            result = result.replace("\r\n", "\n").replace("\r", "\n");
+            break;
+        case 1: // CRLF
+            result = result.replace("\r\n", "\r\n").replace("\r", "\r\n").replace("\n", "\r\n");
+            break;
+        case 2: // CR
+            result = result.replace("\r\n", "\r").replace("\n", "\r");
+            break;
+    }
+    
+    return result;
 }
 
 void NotepadApp::onTextChange()
@@ -356,14 +448,15 @@ bool NotepadApp::eventFilter(QObject *obj, QEvent *event)
     if (obj == editor && event->type() == QEvent::KeyPress) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
         
-        // Track line endings
+       // Track line endings
         if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
             // Track if user presses Enter (creates LF) or Ctrl+Enter (creates CRLF)
             if (keyEvent->modifiers() & Qt::ControlModifier) {
-                crLfInfoLabel->setText(tr("CR/LF (DOS)"));
+                currentLineEndingType = 1; // CRLF
             } else {
-                lfInfoLabel->setText(tr("LF (Unix)"));
+                currentLineEndingType = 0; // LF
             }
+            detectLineEndings();
         }
         
         // Update cursor position

@@ -17,8 +17,6 @@ class NotepadApp : public QMainWindow
     Q_OBJECT
 
 private:
-    QMenuBar *menubar;
-    QToolBar *toolbar;
     QAction *cutAction;
     QAction *copyAction;
     QAction *pasteAction;
@@ -28,16 +26,20 @@ private:
     QAction *wrapAction;
     QAction *lineNumbersAction;
     QAction *fontAction;
+    QAction *undoAction;
+    QAction *redoAction;
+    QAction *convertCrlfAction;
+    QAction *convertLfAction;
+    QAction *convertCrAction;
     QTextEdit *editor;
+    QMenuBar *menubar;
+    QToolBar *toolbar;
     QString currentFile;
     bool bufferDirty;
     bool wordWrapEnabled;
     bool lineNumbersEnabled;
-    QStatusBar *statusBar;
-    QLabel *lineInfoLabel;
-    QLabel *crLfInfoLabel;
-    QLabel *lfInfoLabel;
     QFont lineNumberFont;
+    QLabel *lineInfoLabel;
 
 public:
     explicit NotepadApp(QWidget *parent = nullptr);
@@ -55,13 +57,19 @@ private slots:
     void onWrap();
     void onToggleLineNumbers();
     void onFont();
-   void onTextChange();
+    void onTextChange();
+    void onConvertCrlf();
+    void onConvertLf();
+    void onConvertCr();
 
     void updateLineInfo();
+    void detectLineEndings();
 
 private:
-   void setDirty(bool dirty);
-   QString askSave();
+    void setDirty(bool dirty);
+    QString askSave();
+    QString convertLineEndings(const QString &text, int target);
+    int currentLineEndingType; // 0 = LF, 1 = CRLF, 2 = CR
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
