@@ -111,14 +111,14 @@ void NotepadApp::setupUI()
     redoAction->setShortcut(QKeySequence::Redo);
     redoAction->setEnabled(false);
 
-    auto *editMenu = new QMenu(tr("Edit"), menubar);
+   auto *editMenu = new QMenu(tr("Edit"), menubar);
+    editMenu->addAction(undoAction);
+    editMenu->addAction(redoAction);
+    editMenu->addSeparator();
     editMenu->addAction(cutAction);
     editMenu->addAction(copyAction);
     editMenu->addAction(pasteAction);
     editMenu->addAction(selectAllAction);
-    editMenu->addSeparator();
-    editMenu->addAction(undoAction);
-    editMenu->addAction(redoAction);
 
     auto *viewMenu = new QMenu(tr("View"), menubar);
     viewMenu->addAction(wrapAction);
