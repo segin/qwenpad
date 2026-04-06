@@ -426,13 +426,20 @@ void NotepadApp::resizeEvent(QResizeEvent *event)
 void NotepadApp::closeEvent(QCloseEvent *event)
 {
     if (bufferDirty) {
-        QString savedFile = askSave();
-        if (savedFile.isEmpty()) {
+        int reply = QMessageBox::question(this, tr("Save Changes"),
+            tr("The current file has unsaved changes. Do you want to save them?"),
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+
+        if (reply == QMessageBox::Save) {
+            onSave();
+        } else if (reply == QMessageBox::Cancel) {
             event->ignore();
             return;
         }
+        // Discard - clear dirty and continue closing
+        bufferDirty = false;
+        setDirty(false);
     }
-    setDirty(false);
     QMainWindow::closeEvent(event);
 }
 
