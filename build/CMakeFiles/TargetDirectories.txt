@@ -1,3 +1,0 @@
-/home/segin/notepad/build/CMakeFiles/NotepadApp.dir
-/home/segin/notepad/build/CMakeFiles/edit_cache.dir
-/home/segin/notepad/build/CMakeFiles/rebuild_cache.dir
