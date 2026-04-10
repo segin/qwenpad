@@ -1,5 +1,11 @@
-#include "notepadapp.h"
+#include "qwenpad.h"
 #include <QVBoxLayout>
+#include <QFrame>
+#include <QRect>
+#include <QHBoxLayout>
+#include <QVBoxLayout>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -12,7 +18,7 @@
 #include <QKeySequence>
 #include <QSettings>
 
-NotepadApp::NotepadApp(QWidget *parent)
+Qwenpad::Qwenpad(QWidget *parent)
     : QMainWindow(parent)
     , bufferDirty(false)
     , wordWrapEnabled(true)
@@ -23,47 +29,89 @@ NotepadApp::NotepadApp(QWidget *parent)
     editor->installEventFilter(this);
 }
 
-void NotepadApp::setupUI()
+void Qwenpad::setupUI()
 {
     menubar = new QMenuBar(this);
     toolbar = new QToolBar(this);
+
+    // Create main layout with line numbers frame and editor
+    lineNumbersContainer = new QWidget(this);
     editor = new QTextEdit(this);
+    
     QFont font;
     font.setFamily("Monospace");
     font.setFixedPitch(true);
     font.setPointSize(10);
     editor->setFont(font);
-    setCentralWidget(editor);
 
-    // Setup line numbers frame
+    // Setup line numbers styling
     lineNumberFont = editor->font();
     lineNumberFont.setPointSize(lineNumberFont.pointSize() - 1);
     lineNumberFont.setBold(false);
-    editor->installEventFilter(this);
-    connect(editor, &QTextEdit::cursorPositionChanged, this, &NotepadApp::updateLineInfo);
+    
+    // Create line numbers display frame
+    lineNumbersFrame = new QFrame(this);
+    lineNumbersFrame->setStyleSheet("background-color: #f0f0f0;");
+    lineNumbersFrame->setFrameStyle(QFrame::NoFrame);
+    
+    // Create layout for line numbers container
+    mainLayout = new QVBoxLayout(lineNumbersContainer);
+    mainLayout->setSpacing(0);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+    
+    // Layout with line numbers frame and editor
+    QHBoxLayout *editorLayout = new QHBoxLayout();
+    editorLayout->setSpacing(0);
+    editorLayout->setContentsMargins(0, 0, 0, 0);
+    
+    editorLayout->addWidget(lineNumbersFrame);
+    editorLayout->addWidget(editor);
+    
+    mainLayout->addLayout(editorLayout);
+    mainLayout->setStretch(1, 1);
+    
+    // Set the lineNumbersContainer as central widget
+    setCentralWidget(lineNumbersContainer);
 
-    cutAction = new QAction(QIcon::fromTheme("edit-cut"), tr("Cut"), this);
+    editor->installEventFilter(this);
+    connect(editor, &QTextEdit::cursorPositionChanged, this, &Qwenpad::updateLineInfo);
+    
+    // Sync scroll between line numbers and editor
+    editor->installEventFilter(this);
+    connect(editor->verticalScrollBar(), SIGNAL(valueChanged(int)), 
+            this, SLOT(syncLineNumbersScroll(int)));
+    
+    // Connect document change to redraw line numbers
+    connect(editor->document(), &QTextDocument::contentsChanged, 
+            this, &Qwenpad::drawLineNumbers);
+    
+    // Draw initial line numbers if enabled
+    if (lineNumbersEnabled) {
+        drawLineNumbers();
+    }
+
+ cutAction = new QAction(QIcon::fromTheme("edit-cut", QIcon::fromTheme("edit_cut")), tr("Cut"), this);
     cutAction->setShortcuts(QKeySequence::Cut);
     cutAction->setToolTip(tr("Cut"));
     connect(cutAction, &QAction::triggered, editor, &QTextEdit::cut);
 
-    copyAction = new QAction(QIcon::fromTheme("edit-copy"), tr("Copy"), this);
+    copyAction = new QAction(QIcon::fromTheme("edit-copy", QIcon::fromTheme("edit_copy")), tr("Copy"), this);
     copyAction->setShortcuts(QKeySequence::Copy);
     copyAction->setToolTip(tr("Copy"));
     connect(copyAction, &QAction::triggered, editor, &QTextEdit::copy);
 
-    pasteAction = new QAction(QIcon::fromTheme("edit-paste"), tr("Paste"), this);
+    pasteAction = new QAction(QIcon::fromTheme("edit-paste", QIcon::fromTheme("edit_paste")), tr("Paste"), this);
     pasteAction->setShortcuts(QKeySequence::Paste);
     pasteAction->setToolTip(tr("Paste"));
     connect(pasteAction, &QAction::triggered, editor, &QTextEdit::paste);
 
-    selectAllAction = new QAction(tr("Select All"), this);
+    selectAllAction = new QAction(QIcon::fromTheme("edit-select-all", QIcon::fromTheme("select_all")), tr("Select All"), this);
     selectAllAction->setShortcuts(QKeySequence::SelectAll);
     connect(selectAllAction, &QAction::triggered, editor, &QTextEdit::selectAll);
 
-    aboutAction = new QAction(tr("About"), this);
+   aboutAction = new QAction(QIcon::fromTheme("help-about", QIcon::fromTheme("system-help")), tr("About"), this);
     aboutAction->setShortcut(QKeySequence("F1"));
-    connect(aboutAction, &QAction::triggered, this, &NotepadApp::onAbout);
+    connect(aboutAction, &QAction::triggered, this, &Qwenpad::onAbout);
 
     quitAction = new QAction(tr("Quit"), this);
     quitAction->setShortcut(QKeySequence("Ctrl+Q"));
@@ -73,55 +121,66 @@ void NotepadApp::setupUI()
     wrapAction->setShortcut(QKeySequence("Ctrl+W"));
     wrapAction->setCheckable(true);
     wrapAction->setChecked(true);
-    connect(wrapAction, &QAction::triggered, this, &NotepadApp::onWrap);
+    connect(wrapAction, &QAction::triggered, this, &Qwenpad::onWrap);
 
     lineNumbersAction = new QAction(tr("Line Numbers"), this);
     lineNumbersAction->setShortcut(QKeySequence("Ctrl+L"));
     lineNumbersAction->setCheckable(true);
     lineNumbersAction->setChecked(false);
-    connect(lineNumbersAction, &QAction::triggered, this, &NotepadApp::onToggleLineNumbers);
+    connect(lineNumbersAction, &QAction::triggered, this, &Qwenpad::onToggleLineNumbers);
 
     fontAction = new QAction(tr("Font..."), this);
     fontAction->setShortcut(QKeySequence("Ctrl+F"));
-    connect(fontAction, &QAction::triggered, this, &NotepadApp::onFont);
+    connect(fontAction, &QAction::triggered, this, &Qwenpad::onFont);
 
-    // File menu with connected actions
+   // File menu with connected actions
     auto *fileMenu = new QMenu(tr("File"), menubar);
-    QAction *newAction = new QAction(tr("&New"), this);
+    QAction *newAction = new QAction(QIcon::fromTheme("document-new"), tr("&New"), this);
     newAction->setShortcut(QKeySequence::New);
-    connect(newAction, &QAction::triggered, this, &NotepadApp::onNew);
+    connect(newAction, &QAction::triggered, this, &Qwenpad::onNew);
     fileMenu->addAction(newAction);
 
-    QAction *openAction = new QAction(tr("&Open"), this);
+    QAction *openAction = new QAction(QIcon::fromTheme("document-open"), tr("&Open"), this);
     openAction->setShortcut(QKeySequence::Open);
-    connect(openAction, &QAction::triggered, this, &NotepadApp::onOpen);
+    connect(openAction, &QAction::triggered, this, &Qwenpad::onOpen);
     fileMenu->addAction(openAction);
 
-    QAction *saveAction = new QAction(tr("&Save"), this);
+    QAction *saveAction = new QAction(QIcon::fromTheme("document-save"), tr("&Save"), this);
     saveAction->setShortcut(QKeySequence::Save);
-    connect(saveAction, &QAction::triggered, this, &NotepadApp::onSave);
+    connect(saveAction, &QAction::triggered, this, &Qwenpad::onSave);
     fileMenu->addAction(saveAction);
 
- fileMenu->addSeparator();
+    fileMenu->addSeparator();
     fileMenu->addAction(quitAction);
 
     // Undo/Redo actions with shortcuts
-    undoAction = new QAction(tr("&Undo"), this);
+    undoAction = new QAction(QIcon::fromTheme("edit-undo", QIcon::fromTheme("edit_undo")), tr("&Undo"), this);
     undoAction->setShortcut(QKeySequence::Undo);
     undoAction->setEnabled(false);
     
-    redoAction = new QAction(tr("&Redo"), this);
+    redoAction = new QAction(QIcon::fromTheme("edit-redo", QIcon::fromTheme("edit_redo")), tr("&Redo"), this);
     redoAction->setShortcut(QKeySequence::Redo);
     redoAction->setEnabled(false);
 
-   auto *editMenu = new QMenu(tr("Edit"), menubar);
+  // Find action (renamed and moved to bottom)
+    findAction = new QAction(QIcon::fromTheme("edit-find", QIcon::fromTheme("edit_find")), tr("Find/Replace..."), this);
+    findAction->setShortcut(QKeySequence("Ctrl+F"));
+    connect(findAction, &QAction::triggered, this, &Qwenpad::onFind);
+    
+    // Create Find/Replace dialog
+    createFindDialog();
+    
+    auto *editMenu = new QMenu(tr("Edit"), menubar);
     editMenu->addAction(undoAction);
     editMenu->addAction(redoAction);
     editMenu->addSeparator();
     editMenu->addAction(cutAction);
     editMenu->addAction(copyAction);
     editMenu->addAction(pasteAction);
+    editMenu->addSeparator();
     editMenu->addAction(selectAllAction);
+    editMenu->addSeparator();
+    editMenu->addAction(findAction);
 
     auto *viewMenu = new QMenu(tr("View"), menubar);
     viewMenu->addAction(wrapAction);
@@ -144,17 +203,17 @@ void NotepadApp::setupUI()
      // File actions first with icons
      QAction *toolbarNew = new QAction(QIcon::fromTheme("document-new"), tr("New"), this);
      toolbarNew->setShortcut(QKeySequence::New);
-     connect(toolbarNew, &QAction::triggered, this, &NotepadApp::onNew);
+     connect(toolbarNew, &QAction::triggered, this, &Qwenpad::onNew);
      toolbar->addAction(toolbarNew);
      
      QAction *toolbarOpen = new QAction(QIcon::fromTheme("document-open"), tr("Open"), this);
      toolbarOpen->setShortcut(QKeySequence::Open);
-     connect(toolbarOpen, &QAction::triggered, this, &NotepadApp::onOpen);
+     connect(toolbarOpen, &QAction::triggered, this, &Qwenpad::onOpen);
      toolbar->addAction(toolbarOpen);
      
      QAction *toolbarSave = new QAction(QIcon::fromTheme("document-save"), tr("Save"), this);
      toolbarSave->setShortcut(QKeySequence::Save);
-     connect(toolbarSave, &QAction::triggered, this, &NotepadApp::onSave);
+     connect(toolbarSave, &QAction::triggered, this, &Qwenpad::onSave);
      toolbar->addAction(toolbarSave);
      
      toolbar->addSeparator();
@@ -169,7 +228,7 @@ void NotepadApp::setupUI()
     lineInfoLabel = new QLabel(tr("Ln 0, Col 0"));
     statusBar()->addPermanentWidget(lineInfoLabel);
     // Connect editor text change to our slot
-    connect(editor, &QTextEdit::textChanged, this, &NotepadApp::onTextChange);
+    connect(editor, &QTextEdit::textChanged, this, &Qwenpad::onTextChange);
     connect(editor, &QTextEdit::undoAvailable, undoAction, &QAction::setEnabled);
     connect(editor, &QTextEdit::undoAvailable, redoAction, &QAction::setEnabled);
     connect(editor, &QTextEdit::redoAvailable, redoAction, &QAction::setEnabled);
@@ -177,7 +236,7 @@ void NotepadApp::setupUI()
     statusBar()->showMessage(tr("Notepad v0.1"));
 }
 
-  void NotepadApp::onNew()
+  void Qwenpad::onNew()
 {
     if (bufferDirty) {
         int reply = QMessageBox::question(this, tr("New File"),
@@ -199,7 +258,7 @@ void NotepadApp::setupUI()
     setDirty(false);
 }
 
-void NotepadApp::onOpen()
+void Qwenpad::onOpen()
 {
     if (bufferDirty) {
         QString savedFile = askSave();
@@ -249,7 +308,7 @@ void NotepadApp::onOpen()
     }
 }
 
-void NotepadApp::onSave()
+void Qwenpad::onSave()
 {
     QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"),
         currentFile.isEmpty() ? QString() : currentFile, tr("Text Files (*.txt)"));
@@ -281,32 +340,32 @@ void NotepadApp::onSave()
     }
 }
 
-void NotepadApp::onCut()
+void Qwenpad::onCut()
 {
     editor->cut();
 }
 
-void NotepadApp::onCopy()
+void Qwenpad::onCopy()
 {
     editor->copy();
 }
 
-void NotepadApp::onPaste()
+void Qwenpad::onPaste()
 {
     editor->paste();
 }
 
-void NotepadApp::onSelectAll()
+void Qwenpad::onSelectAll()
 {
     editor->selectAll();
 }
 
-void NotepadApp::onAbout()
+void Qwenpad::onAbout()
 {
     QMessageBox::information(this, tr("About"), tr("Notepad v0.1"));
 }
 
-void NotepadApp::onWrap()
+void Qwenpad::onWrap()
 {
     QTextOption::WrapMode mode = wrapAction->isChecked()
         ? QTextOption::WrapMode::WordWrap
@@ -314,13 +373,21 @@ void NotepadApp::onWrap()
     editor->setWordWrapMode(mode);
 }
 
-void NotepadApp::onToggleLineNumbers()
+void Qwenpad::onToggleLineNumbers()
 {
     lineNumbersEnabled = lineNumbersAction->isChecked();
-    // Line numbers are handled via event filter
+    
+    if (lineNumbersEnabled) {
+        drawLineNumbers();
+    } else {
+        // Hide line numbers
+        if (lineNumbersFrame) {
+            lineNumbersFrame->setVisible(false);
+        }
+    }
 }
 
-void NotepadApp::onFont()
+void Qwenpad::onFont()
 {
     bool ok;
     QFont font = QFontDialog::getFont(&ok, this);
@@ -329,7 +396,7 @@ void NotepadApp::onFont()
     }
 }
 
-void NotepadApp::onConvertCrlf()
+void Qwenpad::onConvertCrlf()
 {
     QString content = editor->toPlainText();
     QString converted = convertLineEndings(content, 1); // 1 = CRLF
@@ -339,7 +406,7 @@ void NotepadApp::onConvertCrlf()
     detectLineEndings();
 }
 
-void NotepadApp::onConvertLf()
+void Qwenpad::onConvertLf()
 {
     QString content = editor->toPlainText();
     QString converted = convertLineEndings(content, 0); // 0 = LF
@@ -349,7 +416,7 @@ void NotepadApp::onConvertLf()
     detectLineEndings();
 }
 
-void NotepadApp::onConvertCr()
+void Qwenpad::onConvertCr()
 {
     QString content = editor->toPlainText();
     QString converted = convertLineEndings(content, 2); // 2 = CR
@@ -359,7 +426,7 @@ void NotepadApp::onConvertCr()
     detectLineEndings();
 }
 
-void NotepadApp::detectLineEndings()
+void Qwenpad::detectLineEndings()
 {
     QString content = editor->toPlainText();
     int crCount = content.count('\r');
@@ -375,7 +442,7 @@ void NotepadApp::detectLineEndings()
     }
 }
 
-QString NotepadApp::convertLineEndings(const QString &text, int target)
+QString Qwenpad::convertLineEndings(const QString &text, int target)
 {
     QString result = text;
     
@@ -394,13 +461,13 @@ QString NotepadApp::convertLineEndings(const QString &text, int target)
     return result;
 }
 
-void NotepadApp::onTextChange()
+void Qwenpad::onTextChange()
 {
     setDirty(true);
     updateLineInfo();
 }
 
-void NotepadApp::setDirty(bool dirty)
+void Qwenpad::setDirty(bool dirty)
 {
     bufferDirty = dirty;
     QString title = currentFile.isEmpty() ? tr("Notepad") : QFileInfo(currentFile).fileName();
@@ -411,7 +478,7 @@ void NotepadApp::setDirty(bool dirty)
     setWindowTitle(title);
 }
 
-QString NotepadApp::askSave()
+QString Qwenpad::askSave()
 {
     if (!bufferDirty) {
         return QString();
@@ -433,12 +500,12 @@ QString NotepadApp::askSave()
     return QString();
 }
 
-void NotepadApp::resizeEvent(QResizeEvent *event)
+void Qwenpad::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
 }
 
-void NotepadApp::closeEvent(QCloseEvent *event)
+void Qwenpad::closeEvent(QCloseEvent *event)
 {
     if (bufferDirty) {
         int reply = QMessageBox::question(this, tr("Save Changes"),
@@ -458,7 +525,7 @@ void NotepadApp::closeEvent(QCloseEvent *event)
     QMainWindow::closeEvent(event);
 }
 
-void NotepadApp::updateLineInfo()
+void Qwenpad::updateLineInfo()
 {
     QTextCursor cursor = editor->textCursor();
     int line = cursor.blockNumber() + 1;
@@ -466,7 +533,7 @@ void NotepadApp::updateLineInfo()
     lineInfoLabel->setText(tr("Ln %1, Col %2").arg(line).arg(col));
 }
 
-bool NotepadApp::eventFilter(QObject *obj, QEvent *event)
+bool Qwenpad::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj == editor && event->type() == QEvent::KeyPress) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
@@ -488,5 +555,179 @@ bool NotepadApp::eventFilter(QObject *obj, QEvent *event)
         return false;
     }
     
-    return QObject::eventFilter(obj, event);
+     return QObject::eventFilter(obj, event);
+}
+
+void Qwenpad::syncLineNumbersScroll(int value)
+{
+    if (lineNumbersEnabled) {
+        // No need to sync - editor scrolls automatically
+        (void)value;
+    }
+}
+
+void Qwenpad::drawLineNumbers()
+{
+    if (!lineNumbersEnabled || !lineNumbersFrame) return;
+    
+    QTextDocument *doc = editor->document();
+    int blockCount = doc->blockCount();
+    static QLabel *lineLabel = nullptr;
+    
+    if (!lineLabel) {
+        lineLabel = new QLabel(lineNumbersFrame);
+        lineLabel->setStyleSheet("background-color: #f0f0f0;");
+        lineLabel->setFont(lineNumberFont);
+        
+        // Create layout
+        QVBoxLayout *layout = new QVBoxLayout(lineNumbersFrame);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(0);
+        layout->addWidget(lineLabel);
+    }
+    
+    // Build line numbers text
+    QString lineNumbersText;
+    for (int i = 1; i <= blockCount; i++) {
+        lineNumbersText += QString::number(i) + "\n";
+    }
+    
+    lineLabel->setText(lineNumbersText);
+    
+    // Set width based on max line number
+    QFontMetrics fm = editor->fontMetrics();
+    int digits = QString::number(blockCount).length();
+  int width = (digits + 2) * fm.horizontalAdvance('0') + 5;
+     lineNumbersFrame->setFixedWidth(width);
+    
+    // Sync scrolling
+    connect(editor->verticalScrollBar(), SIGNAL(valueChanged(int)), 
+            lineLabel, SLOT(scrollContentsBy(int)));
+    
+     // Update on document change
+    connect(doc, &QTextDocument::blockCountChanged, this, &Qwenpad::drawLineNumbers);
+}
+
+void Qwenpad::createFindDialog()
+{
+    findDialog = new QDialog(this);
+    findDialog->setWindowTitle(tr("Find"));
+    findDialog->setMinimumWidth(300);
+    
+    QGridLayout *layout = new QGridLayout(findDialog);
+    
+    findLineEdit = new QLineEdit();
+    findLineEdit->setPlaceholderText(tr("Enter text to find..."));
+    layout->addWidget(findLineEdit, 0, 0);
+    
+    replaceLineEdit = new QLineEdit();
+    replaceLineEdit->setPlaceholderText(tr("Enter replacement text (optional)..."));
+    layout->addWidget(replaceLineEdit, 1, 0);
+    
+    findNextButton = new QPushButton(tr("Find Next"));
+    layout->addWidget(findNextButton, 2, 0);
+    
+    replaceButton = new QPushButton(tr("Replace"));
+    layout->addWidget(replaceButton, 3, 0);
+    
+    replaceAllButton = new QPushButton(tr("Replace All"));
+    layout->addWidget(replaceAllButton, 4, 0);
+    
+    closeButton = new QPushButton(tr("Close"));
+    layout->addWidget(closeButton, 5, 0);
+    
+    connect(findNextButton, &QPushButton::clicked, this, &Qwenpad::onFindNext);
+    connect(replaceButton, &QPushButton::clicked, this, &Qwenpad::onReplace);
+    connect(replaceAllButton, &QPushButton::clicked, this, &Qwenpad::onReplaceAll);
+    connect(closeButton, &QPushButton::clicked, this, &Qwenpad::onCloseFindDialog);
+    connect(findLineEdit, &QLineEdit::returnPressed, this, &Qwenpad::onFindNext);
+}
+
+void Qwenpad::onFind()
+{
+    if (findDialog) {
+        findDialog->show();
+        findLineEdit->setFocus();
+    }
+}
+
+void Qwenpad::onFindNext()
+{
+    QString searchText = findLineEdit->text();
+    if (searchText.isEmpty()) {
+        QMessageBox::information(findDialog, tr("Find"), tr("Please enter text to find"));
+        return;
+    }
+    
+    QTextCursor cursor = editor->textCursor();
+    QTextCursor foundCursor = cursor.document()->find(searchText);
+    
+    if (foundCursor.position() >= 0) {
+        editor->setTextCursor(foundCursor);
+        editor->ensureCursorVisible();
+    } else {
+        // Reset to start of document
+        cursor.setPosition(0);
+        editor->setTextCursor(cursor);
+        foundCursor = cursor.document()->find(searchText);
+        
+        if (foundCursor.position() >= 0) {
+            editor->setTextCursor(foundCursor);
+            editor->ensureCursorVisible();
+        } else {
+            QMessageBox::information(findDialog, tr("Find"), tr("Text not found"));
+        }
+    }
+}
+
+void Qwenpad::onReplace()
+{
+    QString searchText = findLineEdit->text();
+    QString replaceText = replaceLineEdit->text();
+    
+    if (searchText.isEmpty()) {
+        QMessageBox::information(findDialog, tr("Replace"), tr("Please enter text to find"));
+        return;
+    }
+    
+    QTextCursor cursor = editor->textCursor();
+    QTextCursor foundCursor = cursor.document()->find(searchText);
+    
+    if (foundCursor.position() >= 0) {
+        cursor = editor->textCursor();
+        cursor.insertText(replaceText);
+        editor->setTextCursor(cursor);
+        editor->ensureCursorVisible();
+    } else {
+        // Reset to start of document
+        cursor.setPosition(0);
+        editor->setTextCursor(cursor);
+        foundCursor = cursor.document()->find(searchText);
+        
+        if (foundCursor.position() < 0) {
+            QMessageBox::information(findDialog, tr("Replace"), tr("Text not found"));
+        }
+    }
+}
+
+void Qwenpad::onReplaceAll()
+{
+    QString searchText = findLineEdit->text();
+    QString replaceText = replaceLineEdit->text();
+    
+    if (searchText.isEmpty()) {
+        QMessageBox::information(findDialog, tr("Replace All"), tr("Please enter text to find"));
+        return;
+    }
+    
+    QString originalText = editor->toPlainText();
+    QString modifiedText = originalText.replace(searchText, replaceText);
+    
+    editor->setPlainText(modifiedText);
+    setDirty(true);
+}
+
+void Qwenpad::onCloseFindDialog()
+{
+    findDialog->close();
 }

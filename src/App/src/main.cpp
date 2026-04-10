@@ -1,10 +1,10 @@
 #include <QApplication>
-#include "notepadapp.h"
+#include "qwenpad.h"
 
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-    NotepadApp window;
+    Qwenpad window;
     window.show();
     return app.exec();
 }

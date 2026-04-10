@@ -1,5 +1,5 @@
-#ifndef NOTEPADAPP_H
-#define NOTEPADAPP_H
+#ifndef QWENPAD_H
+#define QWENPAD_H
 
 #include <QMainWindow>
 #include <QMenuBar>
@@ -11,8 +11,18 @@
 #include <QResizeEvent>
 #include <QCloseEvent>
 #include <QLabel>
+#include <QVBoxLayout>
+#include <QFrame>
+#include <QFont>
+#include <QLabel>
+#include <QDialog>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QDialogButtonBox>
+#include <QGridLayout>
+#include <QKeySequence>
 
-class NotepadApp : public QMainWindow
+class Qwenpad : public QMainWindow
 {
     Q_OBJECT
 
@@ -30,6 +40,7 @@ QAction *undoAction;
     QAction *redoAction;
     QAction *convertLfAction;
     QAction *convertCrAction;
+    QAction *findAction;
     QTextEdit *editor;
     QMenuBar *menubar;
     QToolBar *toolbar;
@@ -39,10 +50,21 @@ QAction *undoAction;
     bool lineNumbersEnabled;
     QFont lineNumberFont;
     QLabel *lineInfoLabel;
+    QFrame *lineNumbersFrame;
+    QVBoxLayout *mainLayout;
+    QWidget *lineNumbersContainer;
+    QDialog *findDialog;
+    QLineEdit *findLineEdit;
+    QLineEdit *replaceLineEdit;
+    QPushButton *findNextButton;
+    QPushButton *replaceButton;
+    QPushButton *replaceAllButton;
+    QPushButton *closeButton;
 
 public:
-    explicit NotepadApp(QWidget *parent = nullptr);
+    explicit Qwenpad(QWidget *parent = nullptr);
     void setupUI();
+    void createFindDialog();
 
 private slots:
     void onNew();
@@ -60,9 +82,16 @@ private slots:
     void onConvertCrlf();
     void onConvertLf();
     void onConvertCr();
+    void onFind();
 
     void updateLineInfo();
     void detectLineEndings();
+    void syncLineNumbersScroll(int value);
+    void drawLineNumbers();
+    void onFindNext();
+    void onReplace();
+    void onReplaceAll();
+    void onCloseFindDialog();
 
 private:
     void setDirty(bool dirty);
@@ -76,4 +105,4 @@ protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
 };
 
-#endif // NOTEPADAPP_H
+#endif // QWENPAD_H
