@@ -577,11 +577,6 @@ void Qwenpad::updateLineInfo()
     lineInfoLabel->setText(tr("Ln %1, Col %2").arg(line).arg(col));
 }
 
-bool Qwenpad::eventFilter(QObject *obj, QEvent *event)
-{
-    return QMainWindow::eventFilter(obj, event);
-}
-
 void Qwenpad::drawLineNumbers()
 {
     if (!lineNumbersEnabled || !lineNumberWidget) {
@@ -608,13 +603,15 @@ void Qwenpad::onFindNext()
     }
 
     QTextCursor cursor = editor->textCursor();
-    QTextCursor foundCursor = cursor.document()->find(searchText);
+    QTextCursor foundCursor = editor->document()->find(searchText, cursor);
 
-    if (foundCursor.isNull()) {
+    if (!foundCursor.isNull()) {
+        editor->setTextCursor(foundCursor);
+        editor->ensureCursorVisible();
+    } else {
         cursor = editor->textCursor();
-        cursor.setPosition(0);
         editor->setTextCursor(cursor);
-        foundCursor = cursor.document()->find(searchText);
+        foundCursor = editor->document()->find(searchText, cursor);
 
         if (foundCursor.isNull()) {
             QMessageBox::information(findDialog, tr("Find"), tr("Text not found"));
@@ -622,9 +619,6 @@ void Qwenpad::onFindNext()
             editor->setTextCursor(foundCursor);
             editor->ensureCursorVisible();
         }
-    } else {
-        editor->setTextCursor(foundCursor);
-        editor->ensureCursorVisible();
     }
 }
 
@@ -639,28 +633,28 @@ void Qwenpad::onReplace()
     }
 
     QTextCursor cursor = editor->textCursor();
-    QTextCursor foundCursor = cursor.document()->find(searchText);
+    QTextCursor foundCursor = editor->document()->find(searchText, cursor);
 
-    if (foundCursor.isNull()) {
-        cursor.setPosition(0);
+    if (!foundCursor.isNull()) {
+        if (!replaceText.isEmpty()) {
+            foundCursor.insertText(replaceText);
+        }
+        editor->setTextCursor(foundCursor);
+        editor->ensureCursorVisible();
+    } else {
+        cursor = editor->textCursor();
         editor->setTextCursor(cursor);
-        foundCursor = cursor.document()->find(searchText);
+        foundCursor = editor->document()->find(searchText, cursor);
 
         if (foundCursor.isNull()) {
             QMessageBox::information(findDialog, tr("Replace"), tr("Text not found"));
         } else {
             if (!replaceText.isEmpty()) {
-                cursor.insertText(replaceText);
+                foundCursor.insertText(replaceText);
             }
-            editor->setTextCursor(cursor);
+            editor->setTextCursor(foundCursor);
             editor->ensureCursorVisible();
         }
-    } else {
-        if (!replaceText.isEmpty()) {
-            cursor.insertText(replaceText);
-        }
-        editor->setTextCursor(cursor);
-        editor->ensureCursorVisible();
     }
 }
 
@@ -677,14 +671,21 @@ void Qwenpad::onReplaceAll()
     QString modifiedText = editor->toPlainText();
     int replacementCount = modifiedText.count(searchText);
 
-    if (replacementCount > 0) {
+  if (replacementCount > 0) {
         QTextCursor cursor(editor->document());
         cursor.beginEditBlock();
         QString text = editor->toPlainText();
         int pos = 0;
         while ((pos = text.indexOf(searchText, pos)) >= 0) {
             cursor.setPosition(pos);
-            cursor.insertText(replaceText);
+            if (searchText.length() > 0) {
+                cursor.setPosition(pos + searchText.length(), QTextCursor::KeepAnchor);
+                if (replaceText.isEmpty()) {
+                    cursor.removeSelectedText();
+                } else {
+                    cursor.insertText(replaceText);
+                }
+            }
             text.replace(pos, searchText.length(), replaceText);
             pos += replaceText.length();
         }
