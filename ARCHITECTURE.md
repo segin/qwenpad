@@ -8,18 +8,14 @@
 │   └── App/          # Application module
 │       └── src/      # Application source files
 │           ├── main.cpp
-│           ├── notepadapp.cpp
-│           └── notepadapp.h
-├── build/            # Build directory
-├── CMakeLists.txt    # CMake configuration
-├── .gitignore        # Git ignore rules
-└── ARCHITECTURE.md   # This document
+│           ├── qwenpad.cpp
+│           └── qwenpad.h
 ```
 
 ## 2. High-Level System Diagram
 
 ```
-[User] --> [NotepadApp (Qt6 GUI)]
+[User] --> [Qwenpad (Qt6 GUI)]
                   |
                   +--> [File Operations]
                   +--> [Text Buffer]
@@ -27,17 +23,17 @@
 
 ## 3. Core Components
 
-### 3.1. NotepadApp
+### 3.1. Qwenpad
 
-**Name:** Notepad Application
+**Name:** Qwenpad Text Editor
 
-**Description:** A simple notepad application providing a graphical user interface for creating, editing, and saving text files. The main window contains a text buffer area where users can input and edit text content.
+**Description:** A simple text editor application providing a graphical user interface for creating, editing, and saving text files. The main window contains a text buffer area where users can input and edit text content.
 
 **Technologies:** C++ (Qt6), Widgets, Core
 
 **Deployment:** Local desktop application
 
-### 3.2. notepadapp.h/cpp
+### 3.2. qwenpad.h/cpp
 
 **Name:** Main Application Logic
 
@@ -102,7 +98,7 @@
 
 ## 10. Project Identification
 
-**Project Name:** NotepadApp
+**Project Name:** Qwenpad
 
 **Repository URL:** git@github.com:segin/qwenpad.git
 
