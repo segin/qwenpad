@@ -68,7 +68,8 @@ void LineEditWidget::paintEvent(QPaintEvent *event)
 
     QTextDocument *doc = textEditor->document();
     QAbstractTextDocumentLayout *layout = doc->documentLayout();
-    QTextBlock block = doc->firstBlock();
+    QTextBlock startBlock = textEditor->cursorForPosition(QPoint(0, 0)).block();
+    QTextBlock block = startBlock;
     QRect clip = event->rect();
     int viewportY = textEditor->verticalScrollBar()->value();
 
