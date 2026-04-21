@@ -6,8 +6,6 @@
 #include <QFontMetrics>
 #include <QTextDocument>
 #include <QAbstractTextDocumentLayout>
-#include <QTextBlock>
-#include <QTextCursor>
 
 LineEditWidget::LineEditWidget(QTextEdit *editor, QWidget *parent)
     : QWidget(parent)
@@ -16,6 +14,7 @@ LineEditWidget::LineEditWidget(QTextEdit *editor, QWidget *parent)
 {
     connect(editor->verticalScrollBar(), static_cast<void (QAbstractSlider::*)(int)>(&QAbstractSlider::valueChanged), this, [this](int) { updateLineNumbers(); });
     connect(editor->document(), &QTextDocument::contentsChanged, this, &LineEditWidget::updateLineNumbers);
+    connect(editor->document(), &QTextDocument::blockCountChanged, this, &LineEditWidget::updateWidth);
 }
 
 void LineEditWidget::setFont(const QFont &font)
@@ -68,30 +67,28 @@ void LineEditWidget::paintEvent(QPaintEvent *event)
     painter.setFont(displayFont);
 
     QTextDocument *doc = textEditor->document();
+    QAbstractTextDocumentLayout *layout = doc->documentLayout();
     QTextBlock block = doc->firstBlock();
-    QTextCursor cursor(doc);
-    int lineNumber = 1;
-
     QRect clip = event->rect();
-    int viewportY = textEditor->viewport()->geometry().y();
+    int viewportY = textEditor->verticalScrollBar()->value();
 
     while (block.isValid()) {
-        QTextDocument *doc = textEditor->document();
-        QAbstractTextDocumentLayout *layout = doc->documentLayout();
         QRectF blockRect = layout->blockBoundingRect(block);
-        int pixelY = blockRect.top() - textEditor->verticalScrollBar()->value() + viewportY;
+        int pixelY = static_cast<int>(blockRect.top()) - viewportY;
 
-        if (pixelY >= clip.bottom() || (pixelY + blockRect.height()) <= clip.top()) {
+        if (pixelY > clip.bottom()) {
+            break;
+        }
+
+        if ((pixelY + static_cast<int>(blockRect.height())) < clip.top()) {
             block = block.next();
-            ++lineNumber;
             continue;
         }
 
-        QRect textRect(clip.x(), pixelY, clip.width(), blockRect.height());
+        QRect textRect(clip.x(), pixelY, clip.width(), static_cast<int>(blockRect.height()));
         painter.drawText(textRect, Qt::AlignRight | Qt::AlignTop, QString::number(block.blockNumber() + 1));
 
         block = block.next();
-        ++lineNumber;
     }
 }
 

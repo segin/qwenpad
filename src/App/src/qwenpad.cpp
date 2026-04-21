@@ -496,10 +496,10 @@ QString Qwenpad::convertLineEndings(const QString &text, int target)
         result.replace("\r\n", "\n").replace("\r", "\n");
         break;
     case 1:
-        result.replace("\r", "\r\n").replace("\n", "\r\n");
+        result.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n");
         break;
     case 2:
-        result.replace("\r\n", "\r").replace("\n", "\r");
+        result.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r");
         break;
     }
 
@@ -579,14 +579,7 @@ void Qwenpad::updateLineInfo()
 
 bool Qwenpad::eventFilter(QObject *obj, QEvent *event)
 {
-    if (obj == editor && event->type() == QEvent::KeyPress) {
-        QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
-        Q_UNUSED(keyEvent);
-        updateLineInfo();
-        return false;
-    }
-
-    return QObject::eventFilter(obj, event);
+    return QMainWindow::eventFilter(obj, event);
 }
 
 void Qwenpad::drawLineNumbers()
@@ -681,12 +674,10 @@ void Qwenpad::onReplaceAll()
         return;
     }
 
-    QString originalText = editor->toPlainText();
-    int replacementCount = originalText.count(searchText);
+    QString modifiedText = editor->toPlainText();
+    int replacementCount = modifiedText.count(searchText);
 
     if (replacementCount > 0) {
-        editor->undo();
-        QString modifiedText = originalText;
         editor->setPlainText(modifiedText.replace(searchText, replaceText));
         setDirty(true);
     } else {

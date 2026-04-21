@@ -26,8 +26,9 @@ class Qwenpad : public QMainWindow
 {
     Q_OBJECT
 
-public:
+  public:
     explicit Qwenpad(QWidget *parent = nullptr);
+    QString convertLineEndings(const QString &text, int target);
 
 private slots:
     void onNew();
@@ -55,16 +56,6 @@ private slots:
     void drawLineNumbers();
 
 private:
-    void setupUI();
-    void setupEditor();
-    void setupActions();
-    void setupMenuBar();
-    void setupToolBar();
-    void setupStatusBar();
-    void setupFindDialog();
-    void setDirty(bool dirty);
-    QString askSave();
-    QString convertLineEndings(const QString &text, int target);
 
     QTextEdit *editor;
     LineEditWidget *lineNumberWidget;
@@ -91,6 +82,15 @@ protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
 
 private:
+    void setupUI();
+    void setupEditor();
+    void setupActions();
+    void setupMenuBar();
+    void setupToolBar();
+    void setupStatusBar();
+    void setupFindDialog();
+    void setDirty(bool dirty);
+    QString askSave();
     QAction *cutAction;
     QAction *copyAction;
     QAction *pasteAction;
