@@ -334,7 +334,7 @@ void Qwenpad::onOpen()
 
             detectLineEndings();
 
-            QSettings settings(fileName + ".meta", QSettings::IniFormat);
+            QSettings settings("Qwenpad", "Qwenpad");
             if (settings.contains("FontFamily")) {
                 QFont restoredFont;
                 restoredFont.setFamily(settings.value("FontFamily").toString());
@@ -374,7 +374,7 @@ void Qwenpad::onSave()
             stream << content;
             file.close();
 
-            QSettings settings(fileName + ".meta", QSettings::IniFormat);
+           QSettings settings("Qwenpad", "Qwenpad");
             settings.setValue("FontFamily", editor->font().family());
             settings.setValue("FontSize", editor->font().pointSize());
             settings.setValue("WordWrapEnabled", wrapAction->isChecked());
@@ -678,7 +678,17 @@ void Qwenpad::onReplaceAll()
     int replacementCount = modifiedText.count(searchText);
 
     if (replacementCount > 0) {
-        editor->setPlainText(modifiedText.replace(searchText, replaceText));
+        QTextCursor cursor(editor->document());
+        cursor.beginEditBlock();
+        QString text = editor->toPlainText();
+        int pos = 0;
+        while ((pos = text.indexOf(searchText, pos)) >= 0) {
+            cursor.setPosition(pos);
+            cursor.insertText(replaceText);
+            text.replace(pos, searchText.length(), replaceText);
+            pos += replaceText.length();
+        }
+        cursor.endEditBlock();
         setDirty(true);
     } else {
         QMessageBox::information(findDialog, tr("Replace All"), tr("Text not found"));
