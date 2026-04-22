@@ -55,6 +55,7 @@ Qwenpad::Qwenpad(QWidget *parent)
     , openAction(nullptr)
     , saveAction(nullptr)
     , closeTabAction(nullptr)
+    , previousEditor(nullptr)
     , bufferDirty(false)
     , wordWrapEnabled(true)
     , lineNumbersEnabled(false)
@@ -603,13 +604,13 @@ QString Qwenpad::askSave(EditorTab *tab)
 void Qwenpad::onCurrentTabChanged()
 {
     QTextEdit *editor = currentEditor();
+    if (previousEditor) {
+        disconnect(previousEditor->document(), &QTextDocument::undoAvailable, undoAction, nullptr);
+        disconnect(previousEditor->document(), &QTextDocument::redoAvailable, redoAction, nullptr);
+    }
+
     if (editor) {
         QTextDocument *doc = editor->document();
-        disconnect(doc, &QTextDocument::undoAvailable, undoAction, nullptr);
-        disconnect(doc, &QTextDocument::redoAvailable, redoAction, nullptr);
-        disconnect(undoAction, &QAction::triggered, nullptr, nullptr);
-        disconnect(redoAction, &QAction::triggered, nullptr, nullptr);
-
         connect(doc, &QTextDocument::undoAvailable, this, [this](bool available) {
             undoAction->setEnabled(available);
         });
@@ -617,15 +618,14 @@ void Qwenpad::onCurrentTabChanged()
             redoAction->setEnabled(available);
         });
 
-        connect(undoAction, &QAction::triggered, this, &Qwenpad::onUndo);
-        connect(redoAction, &QAction::triggered, this, &Qwenpad::onRedo);
-
         undoAction->setEnabled(doc->isUndoAvailable());
         redoAction->setEnabled(doc->isRedoAvailable());
     } else {
         undoAction->setEnabled(false);
         redoAction->setEnabled(false);
     }
+
+    previousEditor = editor;
 }
 
 void Qwenpad::onUndo()

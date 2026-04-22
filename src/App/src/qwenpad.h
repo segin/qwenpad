@@ -53,6 +53,7 @@ private slots:
     private:
 
     QTextEdit *currentEditor();
+    QTextEdit *previousEditor;
     TabManager *tabManager;
     QMenuBar *menubar;
     QToolBar *toolbar;
