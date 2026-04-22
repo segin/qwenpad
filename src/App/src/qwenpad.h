@@ -6,21 +6,15 @@
 #include <QToolBar>
 #include <QAction>
 #include <QMenu>
-#include <QTextEdit>
-#include <QString>
-#include <QResizeEvent>
-#include <QCloseEvent>
 #include <QLabel>
-#include <QVBoxLayout>
-#include <QFrame>
-#include <QFont>
 #include <QDialog>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QDialogButtonBox>
-#include <QGridLayout>
 #include <QKeySequence>
-#include "lineeditwidget.h"
+#include "tabmanager.h"
+
+class SyntaxHighlighter;
 
 class Qwenpad : public QMainWindow
 {
@@ -28,7 +22,6 @@ class Qwenpad : public QMainWindow
 
   public:
     explicit Qwenpad(QWidget *parent = nullptr);
-    QString convertLineEndings(const QString &text, int target);
 
 private slots:
     void onNew();
@@ -42,10 +35,6 @@ private slots:
     void onWrap();
     void onToggleLineNumbers();
     void onFont();
-    void onTextChange();
-    void onConvertCrlf();
-    void onConvertLf();
-    void onConvertCr();
     void onFind();
     void onFindNext();
     void onReplace();
@@ -53,12 +42,18 @@ private slots:
     void onCloseFindDialog();
     void updateLineInfo();
     void detectLineEndings();
-    void drawLineNumbers();
+    void onConvertCrlf();
+    void onConvertLf();
+    void onConvertCr();
+    void onCloseTab();
+    void onCurrentTabChanged();
+    void onUndo();
+    void onRedo();
 
-private:
+    private:
 
-    QTextEdit *editor;
-    LineEditWidget *lineNumberWidget;
+    QTextEdit *currentEditor();
+    TabManager *tabManager;
     QMenuBar *menubar;
     QToolBar *toolbar;
     QLabel *lineInfoLabel;
@@ -70,7 +65,6 @@ private:
     QPushButton *replaceAllButton;
     QPushButton *closeButton;
 
-    QString currentFile;
     bool bufferDirty;
     bool wordWrapEnabled;
     bool lineNumbersEnabled;
@@ -82,33 +76,33 @@ protected:
 
 private:
     void setupUI();
-    void setupEditor();
     void setupActions();
     void setupMenuBar();
     void setupToolBar();
     void setupStatusBar();
     void setupFindDialog();
     void setDirty(bool dirty);
-    QString askSave();
+    QString askSave(EditorTab *tab);
+
+    QAction *newAction;
+    QAction *openAction;
+    QAction *saveAction;
+    QAction *closeTabAction;
     QAction *cutAction;
     QAction *copyAction;
     QAction *pasteAction;
     QAction *selectAllAction;
+    QAction *undoAction;
+    QAction *redoAction;
     QAction *aboutAction;
     QAction *quitAction;
     QAction *wrapAction;
     QAction *lineNumbersAction;
     QAction *fontAction;
-    QAction *undoAction;
-    QAction *redoAction;
     QAction *findAction;
     QAction *toolbarNewAction;
     QAction *toolbarOpenAction;
     QAction *toolbarSaveAction;
-
-    QAction *newAction;
-    QAction *openAction;
-    QAction *saveAction;
 };
 
 #endif // QWENPAD_H

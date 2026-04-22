@@ -1,4 +1,6 @@
 #include "qwenpad.h"
+#include "utils.h"
+#include <QActionGroup>
 #include <QVBoxLayout>
 #include <QFrame>
 #include <QRect>
@@ -18,11 +20,12 @@
 #include <QKeySequence>
 #include <QSettings>
 #include <QPaintEvent>
+#include <QCloseEvent>
+#include <QResizeEvent>
 
 Qwenpad::Qwenpad(QWidget *parent)
     : QMainWindow(parent)
-    , editor(nullptr)
-    , lineNumberWidget(nullptr)
+    , tabManager(nullptr)
     , menubar(nullptr)
     , toolbar(nullptr)
     , lineInfoLabel(nullptr)
@@ -37,22 +40,27 @@ Qwenpad::Qwenpad(QWidget *parent)
     , copyAction(nullptr)
     , pasteAction(nullptr)
     , selectAllAction(nullptr)
+    , undoAction(nullptr)
+    , redoAction(nullptr)
     , aboutAction(nullptr)
     , quitAction(nullptr)
     , wrapAction(nullptr)
     , lineNumbersAction(nullptr)
     , fontAction(nullptr)
-    , undoAction(nullptr)
-    , redoAction(nullptr)
     , findAction(nullptr)
     , toolbarNewAction(nullptr)
     , toolbarOpenAction(nullptr)
     , toolbarSaveAction(nullptr)
+    , newAction(nullptr)
+    , openAction(nullptr)
+    , saveAction(nullptr)
+    , closeTabAction(nullptr)
     , bufferDirty(false)
     , wordWrapEnabled(true)
     , lineNumbersEnabled(false)
     , currentLineEndingType(0)
 {
+    setMinimumSize(620, 400);
     setupUI();
 }
 
@@ -62,66 +70,43 @@ void Qwenpad::setupUI()
     setupMenuBar();
     setupToolBar();
     setupStatusBar();
-    setupEditor();
+    tabManager = new TabManager(this);
+    setCentralWidget(tabManager);
     setupFindDialog();
 }
 
-void Qwenpad::setupEditor()
+QTextEdit *Qwenpad::currentEditor()
 {
-    editor = new QTextEdit(this);
-
-    QFont font;
-    font.setFamily("Monospace");
-    font.setFixedPitch(true);
-    font.setPointSize(10);
-    editor->setFont(font);
-
-    lineNumberWidget = new LineEditWidget(editor, this);
-    lineNumberWidget->setFont(editor->font());
-    lineNumberWidget->setEnabled(false);
-
-    QWidget *centralWidget = new QWidget(this);
-    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->setContentsMargins(0, 0, 0, 0);
-    mainLayout->setSpacing(0);
-
-    QHBoxLayout *editorLayout = new QHBoxLayout();
-    editorLayout->setContentsMargins(0, 0, 0, 0);
-    editorLayout->setSpacing(0);
-    editorLayout->addWidget(lineNumberWidget);
-    editorLayout->addWidget(editor);
-
-    mainLayout->addLayout(editorLayout);
-    setCentralWidget(centralWidget);
-
-    connect(editor, &QTextEdit::cursorPositionChanged, this, &Qwenpad::updateLineInfo);
-    connect(editor->document(), &QTextDocument::contentsChanged, this, &Qwenpad::drawLineNumbers);
-
-    if (lineNumbersEnabled) {
-        drawLineNumbers();
+    if (tabManager && tabManager->currentTab()) {
+        return tabManager->currentTab()->getEditor();
     }
+    return nullptr;
 }
 
 void Qwenpad::setupActions()
 {
-   cutAction = new QAction(QIcon::fromTheme("edit-cut", QIcon::fromTheme("edit_cut")), tr("Cut"), this);
+    undoAction = new QAction(QIcon::fromTheme("edit-undo", QIcon::fromTheme("edit_undo")), tr("Undo"), this);
+    undoAction->setShortcuts(QKeySequence::Undo);
+    undoAction->setToolTip(tr("Undo"));
+
+    redoAction = new QAction(QIcon::fromTheme("edit-redo", QIcon::fromTheme("edit_redo")), tr("Redo"), this);
+    redoAction->setShortcuts(QKeySequence::Redo);
+    redoAction->setToolTip(tr("Redo"));
+
+    cutAction = new QAction(QIcon::fromTheme("edit-cut", QIcon::fromTheme("edit_cut")), tr("Cut"), this);
     cutAction->setShortcuts(QKeySequence::Cut);
     cutAction->setToolTip(tr("Cut"));
-    connect(cutAction, &QAction::triggered, editor, &QTextEdit::cut);
 
     copyAction = new QAction(QIcon::fromTheme("edit-copy", QIcon::fromTheme("edit_copy")), tr("Copy"), this);
     copyAction->setShortcuts(QKeySequence::Copy);
     copyAction->setToolTip(tr("Copy"));
-    connect(copyAction, &QAction::triggered, editor, &QTextEdit::copy);
 
     pasteAction = new QAction(QIcon::fromTheme("edit-paste", QIcon::fromTheme("edit_paste")), tr("Paste"), this);
     pasteAction->setShortcut(QKeySequence::Paste);
     pasteAction->setToolTip(tr("Paste"));
-    connect(pasteAction, &QAction::triggered, editor, &QTextEdit::paste);
 
     selectAllAction = new QAction(QIcon::fromTheme("edit-select-all", QIcon::fromTheme("select_all")), tr("Select All"), this);
     selectAllAction->setShortcuts(QKeySequence::SelectAll);
-    connect(selectAllAction, &QAction::triggered, editor, &QTextEdit::selectAll);
 
     newAction = new QAction(QIcon::fromTheme("document-new"), tr("&New"), this);
     newAction->setShortcut(QKeySequence::New);
@@ -135,6 +120,10 @@ void Qwenpad::setupActions()
     saveAction->setShortcut(QKeySequence::Save);
     connect(saveAction, &QAction::triggered, this, &Qwenpad::onSave);
 
+    closeTabAction = new QAction(tr("Close Tab"), this);
+    closeTabAction->setShortcut(QKeySequence("Ctrl+W"));
+    connect(closeTabAction, &QAction::triggered, this, &Qwenpad::onCloseTab);
+
     toolbarNewAction = new QAction(QIcon::fromTheme("document-new"), tr("New"), this);
     connect(toolbarNewAction, &QAction::triggered, this, &Qwenpad::onNew);
 
@@ -144,7 +133,7 @@ void Qwenpad::setupActions()
     toolbarSaveAction = new QAction(QIcon::fromTheme("document-save"), tr("Save"), this);
     connect(toolbarSaveAction, &QAction::triggered, this, &Qwenpad::onSave);
 
-    aboutAction = new QAction(QIcon::fromTheme("help-about", QIcon::fromTheme("system-help")), tr("About"), this);
+    aboutAction = new QAction(QIcon::fromTheme("help-about", QIcon::fromTheme("system_help")), tr("About"), this);
     aboutAction->setShortcut(QKeySequence("F1"));
     connect(aboutAction, &QAction::triggered, this, &Qwenpad::onAbout);
 
@@ -153,7 +142,7 @@ void Qwenpad::setupActions()
     connect(quitAction, &QAction::triggered, this, &QMainWindow::close);
 
     wrapAction = new QAction(tr("Word Wrap"), this);
-    wrapAction->setShortcut(QKeySequence("Ctrl+W"));
+    wrapAction->setShortcut(QKeySequence("Ctrl+Shift+W"));
     wrapAction->setCheckable(true);
     wrapAction->setChecked(true);
     connect(wrapAction, &QAction::triggered, this, &Qwenpad::onWrap);
@@ -168,17 +157,15 @@ void Qwenpad::setupActions()
     fontAction->setShortcut(QKeySequence("Ctrl+F"));
     connect(fontAction, &QAction::triggered, this, &Qwenpad::onFont);
 
-    undoAction = new QAction(QIcon::fromTheme("edit-undo", QIcon::fromTheme("edit_undo")), tr("&Undo"), this);
-    undoAction->setShortcut(QKeySequence::Undo);
-    undoAction->setEnabled(false);
-
-    redoAction = new QAction(QIcon::fromTheme("edit-redo", QIcon::fromTheme("edit_redo")), tr("&Redo"), this);
-    redoAction->setShortcut(QKeySequence::Redo);
-    redoAction->setEnabled(false);
-
     findAction = new QAction(QIcon::fromTheme("edit-find", QIcon::fromTheme("edit_find")), tr("Find/Replace..."), this);
     findAction->setShortcut(QKeySequence("Ctrl+F"));
     connect(findAction, &QAction::triggered, this, &Qwenpad::onFind);
+
+    connect(undoAction, &QAction::triggered, this, &Qwenpad::onUndo);
+    connect(redoAction, &QAction::triggered, this, &Qwenpad::onRedo);
+
+    connect(tabManager, &TabManager::currentTabDirtyChanged, this, &Qwenpad::updateLineInfo);
+    connect(tabManager, &TabManager::currentChanged, this, &Qwenpad::onCurrentTabChanged);
 }
 
 void Qwenpad::setupMenuBar()
@@ -189,6 +176,8 @@ void Qwenpad::setupMenuBar()
     fileMenu->addAction(newAction);
     fileMenu->addAction(openAction);
     fileMenu->addAction(saveAction);
+    fileMenu->addSeparator();
+    fileMenu->addAction(closeTabAction);
 
     fileMenu->addSeparator();
     fileMenu->addAction(quitAction);
@@ -209,11 +198,48 @@ void Qwenpad::setupMenuBar()
     viewMenu->addAction(wrapAction);
     viewMenu->addAction(lineNumbersAction);
     viewMenu->addSeparator();
+    viewMenu->addSection(tr("Syntax Highlighting"));
+
+    auto *syntaxGroup = new QActionGroup(this);
+    QAction *syntaxNone = syntaxGroup->addAction(tr("None"));
+    syntaxNone->setCheckable(true);
+    syntaxNone->setChecked(true);
+    QAction *syntaxCpp = syntaxGroup->addAction(tr("C/C++"));
+    syntaxCpp->setCheckable(true);
+    QAction *syntaxPython = syntaxGroup->addAction(tr("Python"));
+    syntaxPython->setCheckable(true);
+
+    syntaxGroup->addAction(syntaxNone);
+    syntaxGroup->addAction(syntaxCpp);
+    syntaxGroup->addAction(syntaxPython);
+
+    connect(syntaxNone, &QAction::triggered, this, [this]() {
+        EditorTab *tab = tabManager->currentTab();
+        if (tab) {
+            tab->setHighlighterLanguage("Text");
+        }
+    });
+    connect(syntaxCpp, &QAction::triggered, this, [this]() {
+        EditorTab *tab = tabManager->currentTab();
+        if (tab) {
+            tab->setHighlighterLanguage("C++");
+        }
+    });
+    connect(syntaxPython, &QAction::triggered, this, [this]() {
+        EditorTab *tab = tabManager->currentTab();
+        if (tab) {
+            tab->setHighlighterLanguage("Python");
+        }
+    });
+
+    viewMenu->addAction(syntaxNone);
+    viewMenu->addAction(syntaxCpp);
+    viewMenu->addAction(syntaxPython);
+    viewMenu->addSeparator();
     viewMenu->addAction(fontAction);
 
     auto *helpMenu = new QMenu(tr("Help"), menubar);
     helpMenu->addAction(aboutAction);
-    helpMenu->addSeparator();
     helpMenu->addSeparator();
     helpMenu->addAction(new QAction(tr("&Documentation"), this));
 
@@ -233,6 +259,9 @@ void Qwenpad::setupToolBar()
     toolbar->addAction(toolbarOpenAction);
     toolbar->addAction(toolbarSaveAction);
     toolbar->addSeparator();
+    toolbar->addAction(undoAction);
+    toolbar->addAction(redoAction);
+    toolbar->addSeparator();
     toolbar->addAction(cutAction);
     toolbar->addAction(copyAction);
     toolbar->addAction(pasteAction);
@@ -244,12 +273,6 @@ void Qwenpad::setupStatusBar()
     setStatusBar(new QStatusBar(this));
     lineInfoLabel = new QLabel(tr("Ln 0, Col 0"));
     statusBar()->addPermanentWidget(lineInfoLabel);
-
-    connect(editor, &QTextEdit::textChanged, this, &Qwenpad::onTextChange);
-    connect(editor, &QTextEdit::undoAvailable, undoAction, &QAction::setEnabled);
-    connect(editor, &QTextEdit::undoAvailable, redoAction, &QAction::setEnabled);
-    connect(editor, &QTextEdit::redoAvailable, redoAction, &QAction::setEnabled);
-
     statusBar()->showMessage(tr("Qwenpad v0.1"));
 }
 
@@ -290,121 +313,93 @@ void Qwenpad::setupFindDialog()
 
 void Qwenpad::onNew()
 {
-    if (bufferDirty) {
-        int reply = QMessageBox::question(this, tr("New File"),
-            tr("The current file has unsaved changes. Do you really want to create a new file?"),
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-
-        if (reply == QMessageBox::Save) {
-            onSave();
-        } else if (reply == QMessageBox::Discard) {
-            bufferDirty = false;
-            setDirty(false);
-        } else if (reply == QMessageBox::Cancel) {
-            return;
-        }
-    }
-
-    editor->clear();
-    currentFile.clear();
+    tabManager->addTab(tr("(untitled)"));
     setDirty(false);
 }
 
 void Qwenpad::onOpen()
 {
-    if (bufferDirty) {
-        QString savedFile = askSave();
-        if (savedFile.isEmpty()) {
-            return;
-        }
-    }
-
     QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"),
-        QString(), tr("Text Files (*.txt)"));
+        QString(), tr("All Files (*);;Text Files (*.txt);;C/C++ Files (*.c *.cpp *.hpp *.h);;Python Files (*.py *.pyw)"));
 
     if (!fileName.isEmpty()) {
-        QFile file(fileName);
-        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QTextStream stream(&file);
-            QString content = stream.readAll();
-            file.close();
-            editor->setPlainText(content);
-            currentFile = fileName;
-
-            detectLineEndings();
-
-            QSettings settings("Qwenpad", "Qwenpad");
-            if (settings.contains("FontFamily")) {
-                QFont restoredFont;
-                restoredFont.setFamily(settings.value("FontFamily").toString());
-                restoredFont.setPointSize(settings.value("FontSize").toInt());
-                editor->setFont(restoredFont);
+        EditorTab *tab = nullptr;
+        if (tabManager->count() == 1) {
+            tab = tabManager->currentTab();
+            tab->setFile(fileName);
+        } else {
+            EditorTab *current = tabManager->currentTab();
+            if (current && current->getFile().isEmpty() && !current->isDirty()) {
+                tab = current;
+            } else {
+                tab = tabManager->addTab(tr("(untitled)"));
             }
-            if (settings.contains("WordWrapEnabled")) {
-                wrapAction->setChecked(settings.value("WordWrapEnabled").toBool());
-                onWrap();
-            }
-            if (settings.contains("LineNumbersEnabled")) {
-                lineNumbersAction->setChecked(settings.value("LineNumbersEnabled").toBool());
-                onToggleLineNumbers();
-            }
-            if (settings.contains("LineEndingType")) {
-                currentLineEndingType = settings.value("LineEndingType").toInt();
-            }
-
-            setDirty(false);
         }
+        tab->loadFile(fileName);
+        tab->setFile(fileName);
+        tabManager->updateCurrentTabTitle();
+
+        detectLineEndings();
+
+        QSettings settings("Qwenpad", "Qwenpad");
+        if (settings.contains("FontFamily")) {
+            QFont restoredFont;
+            restoredFont.setFamily(settings.value("FontFamily").toString());
+            restoredFont.setPointSize(settings.value("FontSize").toInt());
+            tabManager->setupFont(restoredFont);
+        }
+        if (settings.contains("WordWrapEnabled")) {
+            wrapAction->setChecked(settings.value("WordWrapEnabled").toBool());
+            onWrap();
+        }
+        if (settings.contains("LineNumbersEnabled")) {
+            lineNumbersAction->setChecked(settings.value("LineNumbersEnabled").toBool());
+            onToggleLineNumbers();
+        }
+        if (settings.contains("LineEndingType")) {
+            currentLineEndingType = settings.value("LineEndingType").toInt();
+        }
+        setDirty(false);
     }
 }
 
 void Qwenpad::onSave()
 {
-    QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"),
-        currentFile.isEmpty() ? QString() : currentFile, tr("Text Files (*.txt)"));
-
-    if (!fileName.isEmpty()) {
-        QString content = editor->toPlainText();
-
-        content = convertLineEndings(content, currentLineEndingType);
-
-        QFile file(fileName);
-        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QTextStream stream(&file);
-            stream << content;
-            file.close();
-
-           QSettings settings("Qwenpad", "Qwenpad");
-            settings.setValue("FontFamily", editor->font().family());
-            settings.setValue("FontSize", editor->font().pointSize());
-            settings.setValue("WordWrapEnabled", wrapAction->isChecked());
-            settings.setValue("LineNumbersEnabled", lineNumbersAction->isChecked());
-            settings.setValue("LineEndingType", currentLineEndingType);
-
-            currentFile = fileName;
-            setDirty(false);
-            QMessageBox::information(this, tr("Save"), tr("File saved successfully"));
-        }
+    if (tabManager) {
+        tabManager->saveCurrentFile();
     }
 }
 
 void Qwenpad::onCut()
 {
-    editor->cut();
+    QTextEdit *editor = currentEditor();
+    if (editor) {
+        editor->cut();
+    }
 }
 
 void Qwenpad::onCopy()
 {
-    editor->copy();
+    QTextEdit *editor = currentEditor();
+    if (editor) {
+        editor->copy();
+    }
 }
 
 void Qwenpad::onPaste()
 {
-    editor->paste();
+    QTextEdit *editor = currentEditor();
+    if (editor) {
+        editor->paste();
+    }
 }
 
 void Qwenpad::onSelectAll()
 {
-    editor->selectAll();
+    QTextEdit *editor = currentEditor();
+    if (editor) {
+        editor->selectAll();
+    }
 }
 
 void Qwenpad::onAbout()
@@ -417,17 +412,18 @@ void Qwenpad::onWrap()
     QTextOption::WrapMode mode = wrapAction->isChecked()
         ? QTextOption::WrapMode::WordWrap
         : QTextOption::WrapMode::NoWrap;
-    editor->setWordWrapMode(mode);
+    for (int i = 0; i < tabManager->count(); i++) {
+        EditorTab *tab = tabManager->getEditorTab(i);
+        if (tab) {
+            tab->getEditor()->setWordWrapMode(mode);
+        }
+    }
 }
 
 void Qwenpad::onToggleLineNumbers()
 {
     lineNumbersEnabled = lineNumbersAction->isChecked();
-    lineNumberWidget->setEnabled(lineNumbersEnabled);
-
-    if (lineNumbersEnabled) {
-        drawLineNumbers();
-    }
+    tabManager->setupLineNumbers(lineNumbersEnabled);
 }
 
 void Qwenpad::onFont()
@@ -435,16 +431,13 @@ void Qwenpad::onFont()
     bool ok;
     QFont font = QFontDialog::getFont(&ok, this);
     if (ok) {
-        editor->setFont(font);
-        lineNumberWidget->setFont(editor->font());
+        tabManager->setupFont(font);
     }
 }
 
 void Qwenpad::onConvertCrlf()
 {
-    QString content = editor->toPlainText();
-    QString converted = convertLineEndings(content, 1);
-    editor->setPlainText(converted);
+    tabManager->convertLineEndings(1);
     currentLineEndingType = 1;
     setDirty(true);
     detectLineEndings();
@@ -452,9 +445,7 @@ void Qwenpad::onConvertCrlf()
 
 void Qwenpad::onConvertLf()
 {
-    QString content = editor->toPlainText();
-    QString converted = convertLineEndings(content, 0);
-    editor->setPlainText(converted);
+    tabManager->convertLineEndings(0);
     currentLineEndingType = 0;
     setDirty(true);
     detectLineEndings();
@@ -462,9 +453,7 @@ void Qwenpad::onConvertLf()
 
 void Qwenpad::onConvertCr()
 {
-    QString content = editor->toPlainText();
-    QString converted = convertLineEndings(content, 2);
-    editor->setPlainText(converted);
+    tabManager->convertLineEndings(2);
     currentLineEndingType = 2;
     setDirty(true);
     detectLineEndings();
@@ -472,76 +461,14 @@ void Qwenpad::onConvertCr()
 
 void Qwenpad::detectLineEndings()
 {
-    QString content = editor->toPlainText();
-    int crCount = content.count('\r');
-    int lfCount = content.count('\n');
-    int crlfCount = content.count("\r\n");
-
-    if (crlfCount > crCount - crlfCount) {
-        currentLineEndingType = 1;
-    } else if (crCount > lfCount) {
-        currentLineEndingType = 2;
-    } else {
-        currentLineEndingType = 0;
-    }
-}
-
-QString Qwenpad::convertLineEndings(const QString &text, int target)
-{
-    QString result = text;
-
-    switch (target) {
-    case 0:
-        result.replace("\r\n", "\n").replace("\r", "\n");
-        break;
-    case 1:
-        result.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n");
-        break;
-    case 2:
-        result.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r");
-        break;
-    }
-
-    return result;
-}
-
-void Qwenpad::onTextChange()
-{
-    setDirty(true);
-    updateLineInfo();
+    tabManager->detectLineEndings();
 }
 
 void Qwenpad::setDirty(bool dirty)
 {
     bufferDirty = dirty;
-    QString title = currentFile.isEmpty() ? tr("Qwenpad") : QFileInfo(currentFile).fileName();
-    if (bufferDirty) {
-        title += tr(" *");
-    }
-    title += tr(" - Qwenpad");
-    setWindowTitle(title);
-}
-
-QString Qwenpad::askSave()
-{
-    if (!bufferDirty) {
-        return QString();
-    }
-
-    int reply = QMessageBox::question(this, tr("Save Changes"),
-        tr("The current file has unsaved changes. Do you want to save them?"),
-        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-
-    if (reply == QMessageBox::Save) {
-        onSave();
-        return currentFile;
-    } else if (reply == QMessageBox::Cancel) {
-        return QString();
-    }
-
-    bufferDirty = false;
-    setWindowTitle(currentFile.isEmpty() ? tr("Qwenpad") : QFileInfo(currentFile).fileName() + tr(" - Qwenpad"));
-    return QString();
+    tabManager->setCurrentTabDirty(dirty);
+    updateLineInfo();
 }
 
 void Qwenpad::resizeEvent(QResizeEvent *event)
@@ -551,38 +478,37 @@ void Qwenpad::resizeEvent(QResizeEvent *event)
 
 void Qwenpad::closeEvent(QCloseEvent *event)
 {
-    if (bufferDirty) {
-        int reply = QMessageBox::question(this, tr("Save Changes"),
-            tr("The current file has unsaved changes. Do you want to save them?"),
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-
-        if (reply == QMessageBox::Save) {
-            onSave();
-        } else if (reply == QMessageBox::Cancel) {
-            event->ignore();
-            return;
+    bool allSaved = true;
+    for (int i = 0; i < tabManager->count(); i++) {
+        EditorTab *tab = tabManager->getEditorTab(i);
+        if (tab && tab->isDirty()) {
+            QString savedFile = askSave(tab);
+            if (savedFile.isEmpty()) {
+                event->ignore();
+                return;
+            }
+            if (tab->isDirty()) {
+                allSaved = false;
+            }
         }
-        bufferDirty = false;
-        setDirty(false);
     }
-    QMainWindow::closeEvent(event);
+
+    if (allSaved) {
+        event->accept();
+    } else {
+        event->ignore();
+    }
 }
 
 void Qwenpad::updateLineInfo()
 {
-    QTextCursor cursor = editor->textCursor();
-    int line = cursor.blockNumber() + 1;
-    int col = cursor.positionInBlock() + 1;
-    lineInfoLabel->setText(tr("Ln %1, Col %2").arg(line).arg(col));
-}
-
-void Qwenpad::drawLineNumbers()
-{
-    if (!lineNumbersEnabled || !lineNumberWidget) {
-        return;
+    QTextEdit *editor = currentEditor();
+    if (editor) {
+        QTextCursor cursor = editor->textCursor();
+        int line = cursor.blockNumber() + 1;
+        int col = cursor.positionInBlock() + 1;
+        lineInfoLabel->setText(tr("Ln %1, Col %2").arg(line).arg(col));
     }
-
-    lineNumberWidget->update();
 }
 
 void Qwenpad::onFind()
@@ -601,21 +527,8 @@ void Qwenpad::onFindNext()
         return;
     }
 
-    QTextDocument *doc = editor->document();
-    QTextCursor cursor = editor->textCursor();
-    QTextCursor foundCursor = doc->find(searchText, cursor);
-
-    if (foundCursor.isNull()) {
-        cursor = editor->textCursor();
-        cursor.setPosition(0);
-        editor->setTextCursor(cursor);
-        foundCursor = doc->find(searchText, cursor);
-    }
-
-    if (!foundCursor.isNull()) {
-        editor->setTextCursor(foundCursor);
-        editor->ensureCursorVisible();
-    } else {
+    bool found = tabManager->findNext(searchText);
+    if (!found) {
         QMessageBox::information(findDialog, tr("Find"), tr("Text not found"));
     }
 }
@@ -630,26 +543,9 @@ void Qwenpad::onReplace()
         return;
     }
 
-    QTextDocument *doc = editor->document();
-    QTextCursor cursor = editor->textCursor();
-    QTextCursor foundCursor = doc->find(searchText, cursor);
-
-    if (!foundCursor.isNull()) {
-        foundCursor.insertText(replaceText);
-        editor->setTextCursor(foundCursor);
-        editor->ensureCursorVisible();
-    } else {
-        cursor.setPosition(0);
-        editor->setTextCursor(cursor);
-        foundCursor = doc->find(searchText, cursor);
-
-        if (foundCursor.isNull()) {
-            QMessageBox::information(findDialog, tr("Replace"), tr("Text not found"));
-        } else {
-            foundCursor.insertText(replaceText);
-            editor->setTextCursor(foundCursor);
-            editor->ensureCursorVisible();
-        }
+    bool found = tabManager->replace(searchText, replaceText);
+    if (!found) {
+        QMessageBox::information(findDialog, tr("Replace"), tr("Text not found"));
     }
 }
 
@@ -663,30 +559,8 @@ void Qwenpad::onReplaceAll()
         return;
     }
 
-    QString modifiedText = editor->toPlainText();
-    int replacementCount = modifiedText.count(searchText);
-
-    if (replacementCount > 0) {
-        QTextCursor cursor(editor->document());
-        cursor.beginEditBlock();
-        QString text = editor->toPlainText();
-        int pos = 0;
-        while ((pos = text.indexOf(searchText, pos)) >= 0) {
-            cursor.setPosition(pos);
-            if (searchText.length() > 0) {
-                cursor.setPosition(pos + searchText.length(), QTextCursor::KeepAnchor);
-                if (replaceText.isEmpty()) {
-                    cursor.removeSelectedText();
-                } else {
-                    cursor.insertText(replaceText);
-                }
-            }
-            text.replace(pos, searchText.length(), replaceText);
-            pos += replaceText.length();
-        }
-        cursor.endEditBlock();
-        setDirty(true);
-    } else {
+    int count = tabManager->replaceAll(searchText, replaceText);
+    if (count == 0) {
         QMessageBox::information(findDialog, tr("Replace All"), tr("Text not found"));
     }
 }
@@ -694,4 +568,81 @@ void Qwenpad::onReplaceAll()
 void Qwenpad::onCloseFindDialog()
 {
     findDialog->close();
+}
+
+void Qwenpad::onCloseTab()
+{
+    tabManager->closeCurrentTab();
+}
+
+QString Qwenpad::askSave(EditorTab *tab)
+{
+    int reply = QMessageBox::question(this, tr("Save Changes"),
+        tr("The current file has unsaved changes. Do you want to save them?"),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+
+    if (reply == QMessageBox::Save) {
+        QString fileName = tab->getFile();
+        if (!fileName.isEmpty()) {
+            tab->saveFile(fileName);
+        } else {
+            QString savedFile = QFileDialog::getSaveFileName(this, tr("Save File"),
+                QString(), tr("Text Files (*.txt)"));
+            if (!savedFile.isEmpty()) {
+                tab->saveFile(savedFile);
+            } else {
+                return QString();
+            }
+        }
+        return tab->getFile();
+    } else if (reply == QMessageBox::Cancel) {
+        return QString();
+    }
+
+    tab->setDirty(false);
+    return QString();
+}
+
+void Qwenpad::onCurrentTabChanged()
+{
+    QTextEdit *editor = currentEditor();
+    if (editor) {
+        QTextDocument *doc = editor->document();
+        disconnect(doc, &QTextDocument::undoAvailable, undoAction, nullptr);
+        disconnect(doc, &QTextDocument::redoAvailable, redoAction, nullptr);
+        disconnect(undoAction, &QAction::triggered, nullptr, nullptr);
+        disconnect(redoAction, &QAction::triggered, nullptr, nullptr);
+
+        connect(doc, &QTextDocument::undoAvailable, this, [this](bool available) {
+            undoAction->setEnabled(available);
+        });
+        connect(doc, &QTextDocument::redoAvailable, this, [this](bool available) {
+            redoAction->setEnabled(available);
+        });
+
+        connect(undoAction, &QAction::triggered, this, &Qwenpad::onUndo);
+        connect(redoAction, &QAction::triggered, this, &Qwenpad::onRedo);
+
+        undoAction->setEnabled(doc->isUndoAvailable());
+        redoAction->setEnabled(doc->isRedoAvailable());
+    } else {
+        undoAction->setEnabled(false);
+        redoAction->setEnabled(false);
+    }
+}
+
+void Qwenpad::onUndo()
+{
+    QTextEdit *editor = currentEditor();
+    if (editor) {
+        editor->undo();
+    }
+}
+
+void Qwenpad::onRedo()
+{
+    QTextEdit *editor = currentEditor();
+    if (editor) {
+        editor->redo();
+    }
 }

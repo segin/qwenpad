@@ -6,19 +6,34 @@
 [Project Root]/
 ├── src/              # Main source code
 │   └── App/          # Application module
-│       └── src/      # Application source files
-│           ├── main.cpp
-│           ├── qwenpad.cpp
-│           └── qwenpad.h
+│       ├── src/      # Application source files
+│       │   ├── main.cpp
+│       │   ├── qwenpad.cpp
+│       │   ├── qwenpad.h
+│       │   ├── edittab.cpp
+│       │   ├── edittab.h
+│       │   ├── tabmanager.cpp
+│       │   ├── tabmanager.h
+│       │   ├── syntaxhighlighter.cpp
+│       │   ├── syntaxhighlighter.h
+│       │   ├── lineeditwidget.cpp
+│       │   └── lineeditwidget.h
+│       └── test/     # Test files
+│           └── test_qwenpad.cpp
+├── build/            # Build output
+└── CMakeLists.txt    # Build configuration
 ```
 
 ## 2. High-Level System Diagram
 
 ```
 [User] --> [Qwenpad (Qt6 GUI)]
-                  |
-                  +--> [File Operations]
-                  +--> [Text Buffer]
+                   |
+                   +--> [Qwenpad]         Main window (menu bar, toolbar, status bar)
+                   +--> [TabManager]      Tab widget managing multiple EditorTabs
+                   +--> [EditorTab]       Editor tab (text area + line numbers)
+                   +--> [SyntaxHighlighter] Syntax coloring (C/C++, Python)
+                   +--> [LineEditWidget]  Custom line number display widget
 ```
 
 ## 3. Core Components
@@ -27,33 +42,73 @@
 
 **Name:** Qwenpad Text Editor
 
-**Description:** A simple text editor application providing a graphical user interface for creating, editing, and saving text files. The main window contains a text buffer area where users can input and edit text content.
+**Description:** A desktop text editor application providing a graphical user interface for creating, editing, and saving text files. The main window contains a menu bar, toolbar, central tab widget, and status bar with line/column info.
 
 **Technologies:** C++ (Qt6), Widgets, Core
 
 **Deployment:** Local desktop application
 
-### 3.2. qwenpad.h/cpp
+### 3.2. Qwenpad (qwenpad.h/cpp)
 
-**Name:** Main Application Logic
+**Name:** Main Window
 
-**Description:** Contains the core window implementation, text buffer management, file operations (open/save), and menu handling.
+**Description:** The main application window class extending QMainWindow. Manages the menu bar (File, Edit, View, Help), toolbar (New, Open, Save), status bar, find/replace dialog, and delegates file operations to TabManager. Persists application settings (font, word wrap, line numbers) via QSettings.
 
 **Technologies:** Qt6::Widgets, Qt6::Core, C++17
 
-**Deployment:** N/A (part of application)
+### 3.3. EditorTab (edittab.h/cpp)
+
+**Name:** Editor Tab Widget
+
+**Description:** A single editor tab widget containing a QTextEdit text area with a custom LineEditWidget for line numbers and a SyntaxHighlighter for syntax coloring. Tracks file path, dirty state, and line ending type. Provides loadFile() and saveFile() operations.
+
+**Technologies:** Qt6::Widgets, Qt6::Core, C++17
+
+### 3.4. TabManager (tabmanager.h/cpp)
+
+**Name:** Tab Manager
+
+**Description:** Extends QTabWidget to manage multiple EditorTab instances. Handles tab creation, closing, enumeration, dirty state tracking, and provides tab-level operations (find/replace, save, font/line number configuration). Emits signals for tab changes and dirty state propagation.
+
+**Technologies:** Qt6::Widgets, Qt6::Core, C++17
+
+### 3.5. SyntaxHighlighter (syntaxhighlighter.h/cpp)
+
+**Name:** Syntax Highlighting Engine
+
+**Description:** Extends QSyntaxHighlighter to provide syntax coloring via QSyntaxHighlighter's document highlighting mechanism. Supports Text (plain), C/C++, and Python languages. Uses regex-based rules for keywords, types, comments, strings, numbers, and hex values. Automatically switches language based on file extension.
+
+**Technologies:** Qt6::Core, Qt6::Widgets, C++17
+
+### 3.6. LineEditWidget (lineeditwidget.h/cpp)
+
+**Name:** Line Number Widget
+
+**Description:** A custom QWidget subclass displaying line numbers alongside the text editor. Synchronized with the editor's vertical scrollbar via signal connections. Repaints only visible line numbers during scroll for performance. Dynamically adjusts width based on the number of blocks in the document.
+
+**Technologies:** Qt6::Widgets, Qt6::Core, C++17
 
 ## 4. Data Stores
 
 ### 4.1. Text Buffer
 
-**Name:** Application Memory Buffer
+**Name:** In-Memory Text Buffer
 
-**Type:** In-memory data structure
+**Type:** QTextDocument (Qt's flow document model)
 
-**Purpose:** Stores the current text content being edited in the application.
+**Purpose:** Stores the current text content being edited in the application. QTextDocument provides the underlying document model with block-based structure and cursor-based operations.
 
 **Key Schemas:** QString-based text storage
+
+### 4.2. Application Settings
+
+**Name:** QSettings Configuration
+
+**Type:** Platform-native configuration storage
+
+**Purpose:** Persists application state across sessions: font family, font size, word wrap toggle, line numbers toggle, and line ending type preference.
+
+**Key Schemas:** QSettings (Qwenpad namespace)
 
 ## 5. External Integrations / APIs
 
@@ -83,18 +138,27 @@
 
 **Local Setup:** CMake-based build system
 
-**Testing Framework:** Not yet configured
+**Testing Framework:** QtTest (QTest) framework with dedicated test executable (qwenpad_tests). Tests cover line ending conversion, QTextDocument find/replace operations.
 
 **Code Quality Tools:** Not yet configured
 
 ## 9. Future Considerations / Roadmap
 
-- [ ] Add syntax highlighting for different file types
-- [ ] Implement search and replace functionality
+- [x] Add syntax highlighting for different file types (C/C++, Python)
+- [x] Implement search and replace functionality
 - [ ] Add auto-save feature
-- [ ] Support for multiple file tabs
-- [ ] Add undo/redo functionality
-- [ ] Add line number display
+- [x] Support for multiple file tabs
+- [x] Add undo/redo functionality
+- [x] Add line number display
+- [ ] Add recent files list
+- [ ] Add color theme support
+- [ ] Expand syntax highlighting to more languages (JavaScript, JSON, XML, HTML, etc.)
+- [ ] Add file encoding detection
+- [ ] Add file watcher for external changes
+- [ ] Add zoom in/out support
+- [ ] Add mini-map or code folding
+- [ ] Add full-text search across all tabs
+- [ ] Improve test coverage (EditorTab, TabManager, syntax highlighting rules)
 
 ## 10. Project Identification
 
@@ -104,7 +168,7 @@
 
 **Primary Contact/Team:** segin
 
-**Date of Last Update:** 2026-04-09
+**Date of Last Update:** 2026-04-21
 
 ## 11. Glossary / Acronyms
 

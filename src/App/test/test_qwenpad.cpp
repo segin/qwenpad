@@ -1,6 +1,8 @@
 #include <QTest>
 #include <QString>
-#include "qwenpad.h"
+#include <QTextDocument>
+#include <QTextCursor>
+#include "utils.h"
 
 class TestQwenpad : public QObject
 {
@@ -12,65 +14,65 @@ private slots:
     void testConvertLineEndingsCR();
     void testConvertLineEndingsAlreadyCRLF();
     void testConvertLineEndingsMixed();
+    void testDocumentFind();
+    void testDocumentFindWrapAround();
+    void testDocumentReplace();
+    void testDocumentReplaceEmpty();
+    void testConvertLineEndingsPreservesNewlines();
 };
 
 void TestQwenpad::testConvertLineEndingsLF()
 {
-    Qwenpad app;
-    QString result = app.convertLineEndings("Hello\r\nWorld", 0);
+    QString result = Utils::convertLineEndings("Hello\r\nWorld", 0);
     QCOMPARE(result, QString("Hello\nWorld"));
 
-    result = app.convertLineEndings("Hello\rWorld", 0);
+    result = Utils::convertLineEndings("Hello\rWorld", 0);
     QCOMPARE(result, QString("Hello\nWorld"));
 
-    result = app.convertLineEndings("Hello\nWorld", 0);
+    result = Utils::convertLineEndings("Hello\nWorld", 0);
     QCOMPARE(result, QString("Hello\nWorld"));
 }
 
 void TestQwenpad::testConvertLineEndingsCRLF()
 {
-    Qwenpad app;
-    QString result = app.convertLineEndings("Hello\nWorld", 1);
+    QString result = Utils::convertLineEndings("Hello\nWorld", 1);
     QCOMPARE(result, QString("Hello\r\nWorld"));
 
-    result = app.convertLineEndings("Hello\rWorld", 1);
+    result = Utils::convertLineEndings("Hello\rWorld", 1);
     QCOMPARE(result, QString("Hello\r\nWorld"));
 
-    result = app.convertLineEndings("Hello\r\nWorld", 1);
+    result = Utils::convertLineEndings("Hello\r\nWorld", 1);
     QCOMPARE(result, QString("Hello\r\nWorld"));
 }
 
 void TestQwenpad::testConvertLineEndingsCR()
 {
-    Qwenpad app;
-    QString result = app.convertLineEndings("Hello\nWorld", 2);
+    QString result = Utils::convertLineEndings("Hello\nWorld", 2);
     QCOMPARE(result, QString("Hello\rWorld"));
 
-    result = app.convertLineEndings("Hello\rWorld", 2);
+    result = Utils::convertLineEndings("Hello\rWorld", 2);
     QCOMPARE(result, QString("Hello\rWorld"));
 
-    result = app.convertLineEndings("Hello\r\nWorld", 2);
+    result = Utils::convertLineEndings("Hello\r\nWorld", 2);
     QCOMPARE(result, QString("Hello\rWorld"));
 }
 
 void TestQwenpad::testConvertLineEndingsAlreadyCRLF()
 {
-    Qwenpad app;
-    QString result = app.convertLineEndings("A\r\nB\r\nC", 1);
+    QString result = Utils::convertLineEndings("A\r\nB\r\nC", 1);
     QCOMPARE(result, QString("A\r\nB\r\nC"));
 
-    result = app.convertLineEndings("A\r\nB\r\nC", 0);
+    result = Utils::convertLineEndings("A\r\nB\r\nC", 0);
     QCOMPARE(result, QString("A\nB\nC"));
 }
 
 void TestQwenpad::testConvertLineEndingsMixed()
 {
-    Qwenpad app;
     QString mixed = "Line1\r\nLine2\rLine3\nLine4";
-    QString result = app.convertLineEndings(mixed, 0);
+    QString result = Utils::convertLineEndings(mixed, 0);
     QCOMPARE(result, QString("Line1\nLine2\nLine3\nLine4"));
 
-    result = app.convertLineEndings(mixed, 1);
+    result = Utils::convertLineEndings(mixed, 1);
     QCOMPARE(result, QString("Line1\r\nLine2\r\nLine3\r\nLine4"));
 }
 
@@ -101,18 +103,17 @@ void TestQwenpad::testDocumentFindWrapAround()
     QCOMPARE(first.selectedText(), QString("World"));
 }
 
-void TestQwenpad::testDocumentReplace()
+  void TestQwenpad::testDocumentReplace()
 {
     QTextDocument doc;
     doc.setPlainText("Hello World");
 
-    QTextCursor cursor(doc);
+    QTextCursor cursor(&doc);
     cursor.beginEditBlock();
 
-    doc.find("World");
-    cursor = doc.find("World");
-    if (!cursor.isNull()) {
+    while ((cursor = doc.find("World", cursor)) != QTextCursor()) {
         cursor.insertText("Qt");
+        break;
     }
 
     cursor.endEditBlock();
@@ -124,7 +125,7 @@ void TestQwenpad::testDocumentReplaceEmpty()
     QTextDocument doc;
     doc.setPlainText("Hello World Qt");
 
-    QTextCursor cursor(doc);
+   QTextCursor cursor(&doc);
     cursor.beginEditBlock();
 
     while ((cursor = doc.find("Qt", cursor)) != QTextCursor()) {
@@ -138,8 +139,7 @@ void TestQwenpad::testDocumentReplaceEmpty()
 
 void TestQwenpad::testConvertLineEndingsPreservesNewlines()
 {
-    Qwenpad app;
-    QString result = app.convertLineEndings("Hello\nWorld", 0);
+    QString result = Utils::convertLineEndings("Hello\nWorld", 0);
     QCOMPARE(result, QString("Hello\nWorld"));
 }
 
