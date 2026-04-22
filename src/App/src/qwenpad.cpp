@@ -326,16 +326,11 @@ void Qwenpad::onOpen()
 
     if (!fileName.isEmpty()) {
         EditorTab *tab = nullptr;
-        if (tabManager->count() == 1) {
-            tab = tabManager->currentTab();
-            tab->setFile(fileName);
+        EditorTab *current = tabManager->currentTab();
+        if (current && (current->getFile().isEmpty() || current->getFile() == tr("(untitled)")) && !current->isDirty()) {
+            tab = current;
         } else {
-            EditorTab *current = tabManager->currentTab();
-            if (current && current->getFile().isEmpty() && !current->isDirty()) {
-                tab = current;
-            } else {
-                tab = tabManager->addTab(tr("(untitled)"));
-            }
+            tab = tabManager->addTab(tr("(untitled)"));
         }
         tab->loadFile(fileName);
         tab->setFile(fileName);
