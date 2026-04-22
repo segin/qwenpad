@@ -38,7 +38,6 @@ EditorTab *TabManager::getEditorTab(int index) const
 EditorTab *TabManager::addTab(const QString &title)
 {
     EditorTab *tab = new EditorTab(title);
-    tab->setupEditor();
     QTabWidget::addTab(tab, title);
     setCurrentWidget(tab);
     emit tabCountChanged(count());

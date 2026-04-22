@@ -73,6 +73,11 @@ void Qwenpad::setupUI()
     tabManager = new TabManager(this);
     setCentralWidget(tabManager);
     setupFindDialog();
+
+    connect(tabManager, &TabManager::currentTabDirtyChanged, this, &Qwenpad::updateLineInfo);
+    connect(tabManager, &TabManager::currentChanged, this, &Qwenpad::onCurrentTabChanged);
+
+    onCurrentTabChanged();
 }
 
 QTextEdit *Qwenpad::currentEditor()
@@ -163,9 +168,6 @@ void Qwenpad::setupActions()
 
     connect(undoAction, &QAction::triggered, this, &Qwenpad::onUndo);
     connect(redoAction, &QAction::triggered, this, &Qwenpad::onRedo);
-
-    connect(tabManager, &TabManager::currentTabDirtyChanged, this, &Qwenpad::updateLineInfo);
-    connect(tabManager, &TabManager::currentChanged, this, &Qwenpad::onCurrentTabChanged);
 }
 
 void Qwenpad::setupMenuBar()
