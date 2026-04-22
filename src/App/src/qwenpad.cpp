@@ -23,6 +23,7 @@
 #include <QPaintEvent>
 #include <QCloseEvent>
 #include <QResizeEvent>
+#include <QUrl>
 
 Qwenpad::Qwenpad(QWidget *parent)
     : QMainWindow(parent)
@@ -366,12 +367,18 @@ void Qwenpad::onNew()
     setDirty(false);
 }
 
-void Qwenpad::onOpen()
+void Qwenpad::openFiles(const QStringList &files)
 {
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"),
-        QString(), tr("All Files (*);;Text Files (*.txt);;C/C++ Files (*.c *.cpp *.hpp *.h);;Python Files (*.py *.pyw)"));
+    for (const QString &fileName : files) {
+        QString path = QUrl(fileName).toLocalFile();
+        if (path.isEmpty()) {
+            path = fileName;
+        }
 
-    if (!fileName.isEmpty()) {
+        if (!QFile::exists(path)) {
+            continue;
+        }
+
         EditorTab *tab = nullptr;
         EditorTab *current = tabManager->currentTab();
         if (current && (current->getFile().isEmpty() || current->getFile() == tr("(untitled)")) && !current->isDirty()) {
@@ -379,10 +386,12 @@ void Qwenpad::onOpen()
         } else {
             tab = tabManager->addTab(tr("(untitled)"));
         }
-        tab->loadFile(fileName);
-        tab->setFile(fileName);
+        tab->loadFile(path);
+        tab->setFile(path);
         tabManager->updateCurrentTabTitle();
+    }
 
+    if (!files.isEmpty()) {
         detectLineEndings();
 
         QSettings settings("Qwenpad", "Qwenpad");
@@ -397,9 +406,33 @@ void Qwenpad::onOpen()
             onWrap();
         }
         if (settings.contains("LineEndingType")) {
-            currentLineEndingType = settings.value("LineEndingType").toInt();
+            int lineEndingType = settings.value("LineEndingType").toInt();
+            if (lineEndingType == 1) {
+                currentLineEndingType = 1;
+                onStatusLineEndingClicked();
+            } else if (lineEndingType == 2) {
+                currentLineEndingType = 2;
+                onStatusLineEndingClicked();
+            } else {
+                currentLineEndingType = 0;
+                onStatusLineEndingClicked();
+            }
         }
-        setDirty(false);
+        if (settings.contains("HighlighterLanguage")) {
+            QString savedLanguage = settings.value("HighlighterLanguage").toString();
+            onStatusLanguageClicked();
+            currentHighlighterLanguage = savedLanguage;
+        }
+    }
+}
+
+void Qwenpad::onOpen()
+{
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"),
+        QString(), tr("All Files (*);;Text Files (*.txt);;C/C++ Files (*.c *.cpp *.hpp *.h);;Python Files (*.py *.pyw)"));
+
+    if (!fileName.isEmpty()) {
+        openFiles(QStringList{fileName});
     }
 }
 

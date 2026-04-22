@@ -22,6 +22,7 @@ class Qwenpad : public QMainWindow
 
   public:
     explicit Qwenpad(QWidget *parent = nullptr);
+    void openFiles(const QStringList &files);
 
 private slots:
     void onNew();
