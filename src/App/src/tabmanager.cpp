@@ -15,6 +15,15 @@ TabManager::TabManager(QWidget *parent)
     , lineInfoLabel(nullptr)
     , lineNumbersEnabled(false)
 {
+    TabBar *bar = new TabBar(this);
+    setTabBar(bar);
+    connect(bar, &TabBar::closeRequested, this, [this](int index) {
+        if (index >= 0 && index < count()) {
+            setCurrentIndex(index);
+            closeCurrentTab();
+        }
+    });
+
     addTab(tr("(untitled)"));
     connect(this, &QTabWidget::currentChanged, this, &TabManager::updateCurrentTabTitle);
 }

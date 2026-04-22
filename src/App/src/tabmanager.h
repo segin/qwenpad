@@ -2,11 +2,48 @@
 #define TABMANAGER_H
 
 #include <QTabWidget>
+#include <QTabBar>
+#include <QMouseEvent>
 #include <QLabel>
 #include <QTextCursor>
 #include <QFont>
 #include <QString>
 #include "edittab.h"
+
+class TabBar : public QTabBar
+{
+    Q_OBJECT
+
+public:
+    explicit TabBar(QWidget *parent = nullptr) : QTabBar(parent) {}
+
+protected:
+    void mousePressEvent(QMouseEvent *event) override
+    {
+        if (event->button() == Qt::MiddleButton) {
+            int tab = tabAt(event->pos());
+            if (tab >= 0) {
+                emit closeRequested(tab);
+                return;
+            }
+        }
+        QTabBar::mousePressEvent(event);
+    }
+
+signals:
+    void closeRequested(int index);
+
+private:
+    void mouseReleaseEvent(QMouseEvent *event) override
+    {
+        QTabBar::mouseReleaseEvent(event);
+    }
+
+    void mouseMoveEvent(QMouseEvent *event) override
+    {
+        QTabBar::mouseMoveEvent(event);
+    }
+};
 
 class TabManager : public QTabWidget
 {
@@ -44,6 +81,7 @@ public:
 signals:
     void tabCountChanged(int count);
     void currentTabDirtyChanged(bool dirty);
+    void tabCloseRequested(int index);
 
 private:
     void updateLineInfo();
