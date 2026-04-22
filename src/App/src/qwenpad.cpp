@@ -611,8 +611,12 @@ void Qwenpad::onCloseTab()
 
 bool Qwenpad::askSave(EditorTab *tab)
 {
+    QString fileName = tab->getFile();
+    if (fileName.isEmpty()) {
+        fileName = tr("(untitled)");
+    }
     int reply = QMessageBox::question(this, tr("Save Changes"),
-        tr("The current file has unsaved changes. Do you want to save them?"),
+        tr("'%1' has unsaved changes. Do you want to save them?").arg(fileName),
         QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
     if (reply == QMessageBox::Save) {
