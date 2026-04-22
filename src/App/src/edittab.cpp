@@ -91,7 +91,7 @@ void EditorTab::setupEditor()
 void EditorTab::loadFile(const QString &fileName)
 {
     QFile file(fileName);
-    if (file.open(QIODevice::ReadOnly)) {
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QTextStream stream(&file);
         QString content = stream.readAll();
         file.close();
