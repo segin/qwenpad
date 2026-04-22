@@ -33,19 +33,25 @@ private slots:
     void onSelectAll();
     void onAbout();
     void onWrap();
-    void onToggleLineNumbers();
+ 
     void onFont();
     void onFind();
     void onFindNext();
     void onReplace();
     void onReplaceAll();
     void onCloseFindDialog();
+    void onGoToLine();
     void updateLineInfo();
     void detectLineEndings();
     void onConvertCrlf();
     void onConvertLf();
     void onConvertCr();
     void onCloseTab();
+    void onZoomIn();
+    void onZoomOut();
+    void updateStatusBar();
+    void onStatusLineEndingClicked();
+    void onStatusLanguageClicked();
     void onCurrentTabChanged();
     void onUndo();
     void onRedo();
@@ -58,18 +64,25 @@ private slots:
     QMenuBar *menubar;
     QToolBar *toolbar;
     QLabel *lineInfoLabel;
+    QPushButton *statusLineEndingLabel;
+    QPushButton *statusLanguageLabel;
     QDialog *findDialog;
+    QDialog *goToLineDialog;
     QLineEdit *findLineEdit;
     QLineEdit *replaceLineEdit;
+    QLineEdit *goToLineEdit;
     QPushButton *findNextButton;
     QPushButton *replaceButton;
     QPushButton *replaceAllButton;
     QPushButton *closeButton;
+    QAction *goToLineAction;
 
     bool bufferDirty;
     bool wordWrapEnabled;
-    bool lineNumbersEnabled;
+ 
     int currentLineEndingType;
+    QString currentHighlighterLanguage;
+    QFont currentFont;
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -82,8 +95,9 @@ private:
     void setupToolBar();
     void setupStatusBar();
     void setupFindDialog();
+    void setupGoToLineDialog();
     void setDirty(bool dirty);
-    QString askSave(EditorTab *tab);
+    bool askSave(EditorTab *tab);
 
     QAction *newAction;
     QAction *openAction;
@@ -98,7 +112,6 @@ private:
     QAction *aboutAction;
     QAction *quitAction;
     QAction *wrapAction;
-    QAction *lineNumbersAction;
     QAction *fontAction;
     QAction *findAction;
     QAction *toolbarNewAction;

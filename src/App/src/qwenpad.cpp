@@ -1,3 +1,4 @@
+#include <QTimer>
 #include "qwenpad.h"
 #include "utils.h"
 #include <QActionGroup>
@@ -45,7 +46,6 @@ Qwenpad::Qwenpad(QWidget *parent)
     , aboutAction(nullptr)
     , quitAction(nullptr)
     , wrapAction(nullptr)
-    , lineNumbersAction(nullptr)
     , fontAction(nullptr)
     , findAction(nullptr)
     , toolbarNewAction(nullptr)
@@ -55,17 +55,21 @@ Qwenpad::Qwenpad(QWidget *parent)
     , openAction(nullptr)
     , saveAction(nullptr)
     , closeTabAction(nullptr)
+    , statusLineEndingLabel(nullptr)
+    , statusLanguageLabel(nullptr)
+    , goToLineDialog(nullptr)
+    , goToLineEdit(nullptr)
+    , goToLineAction(nullptr)
     , previousEditor(nullptr)
     , bufferDirty(false)
     , wordWrapEnabled(true)
-    , lineNumbersEnabled(false)
     , currentLineEndingType(0)
 {
     setMinimumSize(620, 400);
     setupUI();
 }
 
-void Qwenpad::setupUI()
+  void Qwenpad::setupUI()
 {
     setupActions();
     setupMenuBar();
@@ -74,9 +78,11 @@ void Qwenpad::setupUI()
     tabManager = new TabManager(this);
     setCentralWidget(tabManager);
     setupFindDialog();
+    setupGoToLineDialog();
 
     connect(tabManager, &TabManager::currentTabDirtyChanged, this, &Qwenpad::updateLineInfo);
     connect(tabManager, &TabManager::currentChanged, this, &Qwenpad::onCurrentTabChanged);
+    connect(tabManager, &TabManager::currentChanged, this, &Qwenpad::updateStatusBar);
 
     onCurrentTabChanged();
 }
@@ -145,19 +151,15 @@ void Qwenpad::setupActions()
 
     quitAction = new QAction(tr("Quit"), this);
     quitAction->setShortcut(QKeySequence("Ctrl+Q"));
-    connect(quitAction, &QAction::triggered, this, &QMainWindow::close);
+    connect(quitAction, &QAction::triggered, this, [this]() {
+        QTimer::singleShot(0, this, &QMainWindow::close);
+    });
 
     wrapAction = new QAction(tr("Word Wrap"), this);
     wrapAction->setShortcut(QKeySequence("Ctrl+Shift+W"));
     wrapAction->setCheckable(true);
     wrapAction->setChecked(true);
     connect(wrapAction, &QAction::triggered, this, &Qwenpad::onWrap);
-
-    lineNumbersAction = new QAction(tr("Line Numbers"), this);
-    lineNumbersAction->setShortcut(QKeySequence("Ctrl+L"));
-    lineNumbersAction->setCheckable(true);
-    lineNumbersAction->setChecked(false);
-    connect(lineNumbersAction, &QAction::triggered, this, &Qwenpad::onToggleLineNumbers);
 
     fontAction = new QAction(tr("Font..."), this);
     fontAction->setShortcut(QKeySequence("Ctrl+F"));
@@ -166,6 +168,10 @@ void Qwenpad::setupActions()
     findAction = new QAction(QIcon::fromTheme("edit-find", QIcon::fromTheme("edit_find")), tr("Find/Replace..."), this);
     findAction->setShortcut(QKeySequence("Ctrl+F"));
     connect(findAction, &QAction::triggered, this, &Qwenpad::onFind);
+
+    goToLineAction = new QAction(tr("Go to Line..."), this);
+    goToLineAction->setShortcut(QKeySequence("Ctrl+G"));
+    connect(goToLineAction, &QAction::triggered, this, &Qwenpad::onGoToLine);
 
     connect(undoAction, &QAction::triggered, this, &Qwenpad::onUndo);
     connect(redoAction, &QAction::triggered, this, &Qwenpad::onRedo);
@@ -196,10 +202,23 @@ void Qwenpad::setupMenuBar()
     editMenu->addAction(selectAllAction);
     editMenu->addSeparator();
     editMenu->addAction(findAction);
+    editMenu->addAction(goToLineAction);
 
     auto *viewMenu = new QMenu(tr("View"), menubar);
     viewMenu->addAction(wrapAction);
-    viewMenu->addAction(lineNumbersAction);
+    viewMenu->addSeparator();
+    {
+        QAction *zoomInAction = new QAction(tr("Zoom In"), viewMenu);
+        zoomInAction->setShortcut(QKeySequence("Ctrl+Plus"));
+        connect(zoomInAction, &QAction::triggered, this, &Qwenpad::onZoomIn);
+        viewMenu->addAction(zoomInAction);
+    }
+    {
+        QAction *zoomOutAction = new QAction(tr("Zoom Out"), viewMenu);
+        zoomOutAction->setShortcut(QKeySequence("Ctrl+Minus"));
+        connect(zoomOutAction, &QAction::triggered, this, &Qwenpad::onZoomOut);
+        viewMenu->addAction(zoomOutAction);
+    }
     viewMenu->addSeparator();
     viewMenu->addSection(tr("Syntax Highlighting"));
 
@@ -271,11 +290,38 @@ void Qwenpad::setupToolBar()
     addToolBar(toolbar);
 }
 
-void Qwenpad::setupStatusBar()
+  void Qwenpad::setupStatusBar()
 {
     setStatusBar(new QStatusBar(this));
     lineInfoLabel = new QLabel(tr("Ln 0, Col 0"));
     statusBar()->addPermanentWidget(lineInfoLabel);
+
+    statusLineEndingLabel = new QPushButton(tr("LF"));
+    statusLineEndingLabel->setFlat(true);
+    QMenu *leMenu = new QMenu(this);
+    QAction *leLf = leMenu->addAction(tr("LF (Unix)"));
+    QAction *leCrlf = leMenu->addAction(tr("CRLF (Windows)"));
+    QAction *leCr = leMenu->addAction(tr("CR (Mac)"));
+    connect(leLf, &QAction::triggered, this, &Qwenpad::onStatusLineEndingClicked);
+    connect(leCrlf, &QAction::triggered, this, &Qwenpad::onStatusLineEndingClicked);
+    connect(leCr, &QAction::triggered, this, &Qwenpad::onStatusLineEndingClicked);
+    leMenu->setStyleSheet("QMenu { border: none; }");
+    statusLineEndingLabel->setMenu(leMenu);
+    statusBar()->addPermanentWidget(statusLineEndingLabel);
+
+    statusLanguageLabel = new QPushButton(tr("Text"));
+    statusLanguageLabel->setFlat(true);
+    QMenu *langMenu = new QMenu(this);
+    QAction *langNone = langMenu->addAction(tr("None"));
+    QAction *langCpp = langMenu->addAction(tr("C/C++"));
+    QAction *langPy = langMenu->addAction(tr("Python"));
+    connect(langNone, &QAction::triggered, this, &Qwenpad::onStatusLanguageClicked);
+    connect(langCpp, &QAction::triggered, this, &Qwenpad::onStatusLanguageClicked);
+    connect(langPy, &QAction::triggered, this, &Qwenpad::onStatusLanguageClicked);
+    langMenu->setStyleSheet("QMenu { border: none; }");
+    statusLanguageLabel->setMenu(langMenu);
+    statusBar()->addPermanentWidget(statusLanguageLabel);
+
     statusBar()->showMessage(tr("Qwenpad v0.1"));
 }
 
@@ -350,10 +396,6 @@ void Qwenpad::onOpen()
             wrapAction->setChecked(settings.value("WordWrapEnabled").toBool());
             onWrap();
         }
-        if (settings.contains("LineNumbersEnabled")) {
-            lineNumbersAction->setChecked(settings.value("LineNumbersEnabled").toBool());
-            onToggleLineNumbers();
-        }
         if (settings.contains("LineEndingType")) {
             currentLineEndingType = settings.value("LineEndingType").toInt();
         }
@@ -418,13 +460,7 @@ void Qwenpad::onWrap()
     }
 }
 
-void Qwenpad::onToggleLineNumbers()
-{
-    lineNumbersEnabled = lineNumbersAction->isChecked();
-    tabManager->setupLineNumbers(lineNumbersEnabled);
-}
-
-void Qwenpad::onFont()
+ void Qwenpad::onFont()
 {
     bool ok;
     QFont font = QFontDialog::getFont(&ok, this);
@@ -480,8 +516,8 @@ void Qwenpad::closeEvent(QCloseEvent *event)
     for (int i = 0; i < tabManager->count(); i++) {
         EditorTab *tab = tabManager->getEditorTab(i);
         if (tab && tab->isDirty()) {
-            QString savedFile = askSave(tab);
-            if (savedFile.isEmpty()) {
+            bool proceed = askSave(tab);
+            if (!proceed) {
                 event->ignore();
                 return;
             }
@@ -573,7 +609,7 @@ void Qwenpad::onCloseTab()
     tabManager->closeCurrentTab();
 }
 
-QString Qwenpad::askSave(EditorTab *tab)
+bool Qwenpad::askSave(EditorTab *tab)
 {
     int reply = QMessageBox::question(this, tr("Save Changes"),
         tr("The current file has unsaved changes. Do you want to save them?"),
@@ -583,22 +619,23 @@ QString Qwenpad::askSave(EditorTab *tab)
         QString fileName = tab->getFile();
         if (!fileName.isEmpty()) {
             tab->saveFile(fileName);
+            return true;
         } else {
             QString savedFile = QFileDialog::getSaveFileName(this, tr("Save File"),
                 QString(), tr("Text Files (*.txt)"));
             if (!savedFile.isEmpty()) {
                 tab->saveFile(savedFile);
+                return true;
             } else {
-                return QString();
+                return false;
             }
         }
-        return tab->getFile();
     } else if (reply == QMessageBox::Cancel) {
-        return QString();
+        return false;
     }
 
     tab->setDirty(false);
-    return QString();
+    return true;
 }
 
 void Qwenpad::onCurrentTabChanged()
@@ -636,10 +673,167 @@ void Qwenpad::onUndo()
     }
 }
 
-void Qwenpad::onRedo()
+ void Qwenpad::onRedo()
 {
     QTextEdit *editor = currentEditor();
     if (editor) {
         editor->redo();
+    }
+}
+
+void Qwenpad::setupGoToLineDialog()
+{
+    goToLineDialog = new QDialog(this);
+    goToLineDialog->setWindowTitle(tr("Go to Line"));
+    goToLineDialog->setMinimumWidth(350);
+
+    QVBoxLayout *vlayout = new QVBoxLayout(goToLineDialog);
+    vlayout->addWidget(new QLabel(tr("Enter line number:")));
+
+    goToLineEdit = new QLineEdit();
+    goToLineEdit->setPlaceholderText(tr("Line number"));
+    vlayout->addWidget(goToLineEdit);
+
+    QDialogButtonBox *buttonBox = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    vlayout->addWidget(buttonBox);
+
+    connect(buttonBox, &QDialogButtonBox::accepted, this, [this]() {
+        QTextEdit *editor = currentEditor();
+        if (editor) {
+            bool ok;
+            int line = goToLineEdit->text().toInt(&ok);
+            if (ok) {
+                QTextCursor cursor(editor->document());
+                cursor.movePosition(QTextCursor::Start);
+                cursor.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor, line - 1);
+                editor->setTextCursor(cursor);
+                editor->ensureCursorVisible();
+            }
+        }
+        goToLineDialog->close();
+    });
+    connect(buttonBox, &QDialogButtonBox::rejected, this, [this]() {
+        goToLineDialog->close();
+    });
+}
+
+void Qwenpad::onGoToLine()
+{
+    QTextEdit *editor = currentEditor();
+    if (!editor) {
+        return;
+    }
+
+    int totalLines = editor->document()->blockCount();
+    goToLineEdit->setPlaceholderText(tr("Line number (1-%1)").arg(totalLines));
+    goToLineEdit->setText(QString::number(editor->textCursor().blockNumber() + 1));
+    goToLineEdit->selectAll();
+    goToLineEdit->setFocus();
+    goToLineDialog->show();
+}
+
+void Qwenpad::onZoomIn()
+{
+    EditorTab *tab = tabManager->currentTab();
+    if (tab && tab->getEditor()) {
+        tab->getEditor()->zoomIn();
+        tab->getLineNumberWidget()->setFont(tab->getEditor()->font());
+    }
+}
+
+void Qwenpad::onZoomOut()
+{
+    EditorTab *tab = tabManager->currentTab();
+    if (tab && tab->getEditor()) {
+        tab->getEditor()->zoomOut();
+        tab->getLineNumberWidget()->setFont(tab->getEditor()->font());
+    }
+}
+
+void Qwenpad::onStatusLineEndingClicked()
+{
+    QAction *action = static_cast<QAction *>(sender());
+    QString text = action->text();
+    if (text.contains("LF (Unix)")) {
+        tabManager->convertLineEndings(0);
+        currentLineEndingType = 0;
+    } else if (text.contains("CRLF (Windows)")) {
+        tabManager->convertLineEndings(1);
+        currentLineEndingType = 1;
+    } else if (text.contains("CR (Mac)")) {
+        tabManager->convertLineEndings(2);
+        currentLineEndingType = 2;
+    }
+    setDirty(true);
+    detectLineEndings();
+    updateStatusBar();
+}
+
+void Qwenpad::onStatusLanguageClicked()
+{
+    QAction *action = static_cast<QAction *>(sender());
+    QString text = action->text();
+    EditorTab *tab = tabManager->currentTab();
+    if (!tab) {
+        return;
+    }
+
+    if (text == "None") {
+        tab->setHighlighterLanguage("Text");
+        currentHighlighterLanguage = "Text";
+    } else if (text == "C/C++") {
+        tab->setHighlighterLanguage("C++");
+        currentHighlighterLanguage = "C++";
+    } else if (text == "Python") {
+        tab->setHighlighterLanguage("Python");
+        currentHighlighterLanguage = "Python";
+    }
+    updateStatusBar();
+}
+
+void Qwenpad::updateStatusBar()
+{
+    EditorTab *tab = tabManager->currentTab();
+    if (!tab) {
+        return;
+    }
+
+    int type = tab->getLineEndingType();
+    if (type == 0) {
+        statusLineEndingLabel->setText(tr("LF"));
+    } else if (type == 1) {
+        statusLineEndingLabel->setText(tr("CRLF"));
+    } else if (type == 2) {
+        statusLineEndingLabel->setText(tr("CR"));
+    }
+
+    currentHighlighterLanguage = "Text";
+    if (tab->getEditor()->document()->blockCount() > 0) {
+        QTextBlock block = tab->getEditor()->document()->firstBlock();
+        QString text = block.text().trimmed();
+        if (text.startsWith("#!")) {
+            QString shebang = text;
+            if (shebang.contains("python")) {
+                currentHighlighterLanguage = "Python";
+            }
+        }
+        QString fileName = tab->getFile();
+        if (fileName.contains("cpp") || fileName.contains("hpp") ||
+            fileName.endsWith(".c") || fileName.endsWith(".h")) {
+            currentHighlighterLanguage = "C++";
+        } else if (fileName.endsWith(".py") || fileName.endsWith(".pyw")) {
+            currentHighlighterLanguage = "Python";
+        }
+    }
+
+    if (currentHighlighterLanguage == "Text") {
+        statusLanguageLabel->setText(tr("Text"));
+    } else if (currentHighlighterLanguage == "C++") {
+        statusLanguageLabel->setText(tr("C/C++"));
+    } else if (currentHighlighterLanguage == "Python") {
+        statusLanguageLabel->setText(tr("Python"));
+    } else {
+        statusLanguageLabel->setText(tr("Text"));
     }
 }
