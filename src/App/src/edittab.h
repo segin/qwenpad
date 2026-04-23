@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QTextEdit>
 #include <QString>
+#include <QEvent>
 #include "lineeditwidget.h"
 #include "syntaxhighlighter.h"
 
@@ -28,6 +29,9 @@ public:
     void setHighlighterLanguage(const QString &language);
     void saveFile(const QString &fileName);
     void clear();
+
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
 signals:
     void dirtyChanged(bool dirty);

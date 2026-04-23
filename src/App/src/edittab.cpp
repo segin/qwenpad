@@ -78,6 +78,8 @@ void EditorTab::setupEditor()
 
     highlighter = new SyntaxHighlighter(editor->document());
 
+    editor->installEventFilter(this);
+
     connect(editor, &QTextEdit::textChanged, this, [this]() {
         setDirty(true);
     });
@@ -142,4 +144,20 @@ void EditorTab::clear()
     currentFile.clear();
     bufferDirty = false;
     emit dirtyChanged(false);
+}
+
+bool EditorTab::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj == editor && event->type() == QEvent::Wheel) {
+        QWheelEvent *wheel = static_cast<QWheelEvent *>(event);
+        if (wheel->modifiers() & Qt::ControlModifier) {
+            if (wheel->angleDelta().y() > 0) {
+                editor->zoomIn();
+            } else {
+                editor->zoomOut();
+            }
+            return true;
+        }
+    }
+    return QWidget::eventFilter(obj, event);
 }
