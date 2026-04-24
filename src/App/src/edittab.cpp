@@ -79,14 +79,9 @@ void EditorTab::setupEditor()
     highlighter = new SyntaxHighlighter(editor->document());
 
     editor->installEventFilter(this);
-    editor->viewport()->installEventFilter(this);
 
     connect(editor, &QTextEdit::textChanged, this, [this]() {
-        QString currentText = editor->toPlainText();
-        if (initialLoadedText.isEmpty() && currentFile.isEmpty()) {
-            return;
-        }
-        bufferDirty = (currentText != initialLoadedText);
+        bufferDirty = editor->document()->isModified();
         emit dirtyChanged(bufferDirty);
     });
 
@@ -173,14 +168,14 @@ void EditorTab::clear()
             
             if (match.hasMatch()) {
                 QString indentation = match.captured(1);
-                cursor.insertText(indentation);
                 cursor.insertBlock();
+                cursor.insertText(indentation);
                 return true;
             }
         }
     }
     
-    if (obj == editor->viewport() && event->type() == QEvent::Wheel) {
+    if (obj == editor && event->type() == QEvent::Wheel) {
         QWheelEvent *wheel = static_cast<QWheelEvent *>(event);
         if (wheel->modifiers() & Qt::ControlModifier) {
             if (wheel->angleDelta().y() > 0) {

@@ -650,8 +650,8 @@ void Qwenpad::onReplace()
         QRegularExpressionMatch match = regex.match(content, startPos);
         if (match.hasMatch()) {
             QTextCursor cursor(editor->document());
-            cursor.setPosition(startPos);
-            cursor.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor, 1);
+            cursor.setPosition(match.capturedStart());
+            cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor, match.capturedLength());
             cursor.insertText(replaceText);
             editor->setTextCursor(cursor);
             editor->ensureCursorVisible();
@@ -683,11 +683,15 @@ void Qwenpad::onReplaceAll()
 
         QRegularExpression regex(searchText);
         QString content = editor->toPlainText();
-        int count = content.count(regex);
 
-        if (count > 0) {
-            QString replaced = content.replace(regex, replaceText);
-            editor->setPlainText(replaced);
+        if (content.count(regex) > 0) {
+            content.replace(regex, replaceText);
+            QTextCursor cursor(editor->document());
+            cursor.beginEditBlock();
+            cursor.movePosition(QTextCursor::Start);
+            cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
+            cursor.insertText(content);
+            cursor.endEditBlock();
             tabManager->updateCurrentTabTitle();
         } else {
             QMessageBox::information(findDialog, tr("Replace All"), tr("Text not found"));
@@ -919,10 +923,10 @@ void Qwenpad::onStatusLanguageClicked()
 
     QString fileName = tab->getFile();
     if (!fileName.isEmpty()) {
-        if (fileName.contains("cpp") || fileName.contains("hpp") ||
-            fileName.endsWith(".c") || fileName.endsWith(".h")) {
+        QString extension = QFileInfo(fileName).suffix().toLower();
+        if (extension == "cpp" || extension == "hpp" || extension == "h" || extension == "c") {
             currentHighlighterLanguage = "C++";
-        } else if (fileName.endsWith(".py") || fileName.endsWith(".pyw")) {
+        } else if (extension == "py" || extension == "pyw") {
             currentHighlighterLanguage = "Python";
         }
     }
