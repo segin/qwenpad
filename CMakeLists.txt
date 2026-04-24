@@ -15,8 +15,6 @@ add_executable(Qwenpad
     src/App/src/main.cpp
     src/App/src/qwenpad.cpp
     src/App/src/qwenpad.h
-    src/App/src/lineeditwidget.cpp
-    src/App/src/lineeditwidget.h
     src/App/src/edittab.cpp
     src/App/src/edittab.h
     src/App/src/tabmanager.cpp
@@ -30,7 +28,6 @@ target_link_libraries(Qwenpad PRIVATE Qt6::Core Qt6::Widgets)
 add_executable(qwenpad_tests
     src/App/test/test_qwenpad.cpp
     src/App/src/qwenpad.cpp
-    src/App/src/lineeditwidget.cpp
     src/App/src/edittab.cpp
     src/App/src/tabmanager.cpp
     src/App/src/syntaxhighlighter.cpp

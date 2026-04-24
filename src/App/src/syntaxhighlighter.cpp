@@ -199,7 +199,9 @@ void SyntaxHighlighter::addPythonRules()
 
 void SyntaxHighlighter::setLanguage(const QString &language)
 {
+    currentLanguage = language;
     rules.clear();
+
     QString lower = language.toLower();
 
     if (lower == "cpp" || lower == "c" || lower == "c++" || lower == "h" || lower == "hpp") {
@@ -211,6 +213,11 @@ void SyntaxHighlighter::setLanguage(const QString &language)
     }
 
     rehighlight();
+}
+
+ QString SyntaxHighlighter::getLanguage() const
+{
+    return currentLanguage;
 }
 
 void SyntaxHighlighter::highlightBlock(const QString &text)

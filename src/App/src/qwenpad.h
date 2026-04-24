@@ -10,6 +10,7 @@
 #include <QDialog>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QKeySequence>
 #include "tabmanager.h"
@@ -57,6 +58,10 @@ private slots:
     void onUndo();
     void onRedo();
 
+    void saveSession();
+    void restoreSession();
+    QStringList getSessionFiles();
+
     private:
 
     QTextEdit *currentEditor();
@@ -77,10 +82,11 @@ private slots:
     QPushButton *replaceAllButton;
     QPushButton *closeButton;
     QAction *goToLineAction;
+    QCheckBox *regexCheckBox;
 
     bool bufferDirty;
     bool wordWrapEnabled;
- 
+    int untitledTabCount;
     int currentLineEndingType;
     QString currentHighlighterLanguage;
     QFont currentFont;
@@ -88,6 +94,10 @@ private slots:
 protected:
     void resizeEvent(QResizeEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
+
+    void keyPressEvent(QKeyEvent *event) override;
 
 private:
     void setupUI();

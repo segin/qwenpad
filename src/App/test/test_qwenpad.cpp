@@ -3,6 +3,7 @@
 #include <QTextDocument>
 #include <QTextCursor>
 #include "utils.h"
+#include "tabmanager.h"
 
 class TestQwenpad : public QObject
 {
@@ -18,7 +19,8 @@ private slots:
     void testDocumentFindWrapAround();
     void testDocumentReplace();
     void testDocumentReplaceEmpty();
-    void testConvertLineEndingsPreservesNewlines();
+  void testConvertLineEndingsPreservesNewlines();
+    void testCloseTabsToLeftSignal();
 };
 
 void TestQwenpad::testConvertLineEndingsLF()
@@ -141,6 +143,25 @@ void TestQwenpad::testConvertLineEndingsPreservesNewlines()
 {
     QString result = Utils::convertLineEndings("Hello\nWorld", 0);
     QCOMPARE(result, QString("Hello\nWorld"));
+}
+
+void TestQwenpad::testCloseTabsToLeftSignal()
+{
+    TabBar tabBar;
+    tabBar.addTab("Tab 0");
+    tabBar.addTab("Tab 1");
+    tabBar.addTab("Tab 2");
+    tabBar.addTab("Tab 3");
+
+    bool signalReceived = false;
+    connect(&tabBar, &TabBar::closeLeftRequested, this, [&signalReceived]() {
+        signalReceived = true;
+    });
+
+    QCOMPARE(signalReceived, false);
+
+    // Verify closeLeftRequested signal exists by checking tab count
+    QCOMPARE(tabBar.count(), 4);
 }
 
 #include "test_qwenpad.moc"

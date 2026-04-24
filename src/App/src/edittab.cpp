@@ -2,19 +2,19 @@
 #include "utils.h"
 #include <QFile>
 #include <QTextStream>
-#include <QFont>
 #include <QVBoxLayout>
 #include <QTextOption>
 #include <QFileInfo>
+#include <QRegularExpression>
 
 EditorTab::EditorTab(const QString &title, QWidget *parent)
     : QWidget(parent)
     , editor(nullptr)
-    , lineNumberWidget(nullptr)
     , highlighter(nullptr)
     , currentFile(title)
     , bufferDirty(false)
     , lineEndingType(0)
+    , autoIndentEnabled(true)
 {
     setupEditor();
 }
@@ -22,11 +22,6 @@ EditorTab::EditorTab(const QString &title, QWidget *parent)
 QTextEdit *EditorTab::getEditor() const
 {
     return editor;
-}
-
-LineEditWidget *EditorTab::getLineNumberWidget() const
-{
-    return lineNumberWidget;
 }
 
 QString EditorTab::getFile() const
@@ -60,34 +55,44 @@ int EditorTab::getLineEndingType() const
     return lineEndingType;
 }
 
+bool EditorTab::getAutoIndentEnabled() const
+{
+    return autoIndentEnabled;
+}
+
+void EditorTab::setAutoIndentEnabled(bool enabled)
+{
+    autoIndentEnabled = enabled;
+}
+
 void EditorTab::setupEditor()
 {
     editor = new QTextEdit(nullptr);
 
     QFont font;
     font.setFamily("Monospace");
-    font.setFixedPitch(true);
     font.setPointSize(10);
     editor->setFont(font);
     editor->setWordWrapMode(QTextOption::WrapMode::WordWrap);
     editor->setPlainText("");
 
-    lineNumberWidget = new LineEditWidget(editor, nullptr);
-    lineNumberWidget->setFont(editor->font());
-    lineNumberWidget->setEnabled(false);
-
     highlighter = new SyntaxHighlighter(editor->document());
 
+    editor->installEventFilter(this);
     editor->viewport()->installEventFilter(this);
 
     connect(editor, &QTextEdit::textChanged, this, [this]() {
-        setDirty(true);
+        QString currentText = editor->toPlainText();
+        if (initialLoadedText.isEmpty() && currentFile.isEmpty()) {
+            return;
+        }
+        bufferDirty = (currentText != initialLoadedText);
+        emit dirtyChanged(bufferDirty);
     });
 
-    QHBoxLayout *layout = new QHBoxLayout(this);
-    layout->addWidget(lineNumberWidget);
-    layout->addWidget(editor);
+    QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(editor);
 }
 
 void EditorTab::loadFile(const QString &fileName)
@@ -99,6 +104,7 @@ void EditorTab::loadFile(const QString &fileName)
         file.close();
         editor->setPlainText(content);
         currentFile = fileName;
+        initialLoadedText = content;
         bufferDirty = false;
         emit dirtyChanged(false);
 
@@ -125,6 +131,7 @@ void EditorTab::saveFile(const QString &fileName)
         file.close();
 
         currentFile = fileName;
+        initialLoadedText = content;
         bufferDirty = false;
         emit dirtyChanged(false);
     }
@@ -138,16 +145,41 @@ void EditorTab::setHighlighterLanguage(const QString &language)
     }
 }
 
+ QString EditorTab::getHighlighterLanguage() const
+{
+    if (highlighter) {
+        return highlighter->getLanguage();
+    }
+    return "Text";
+}
+
 void EditorTab::clear()
 {
     editor->clear();
     currentFile.clear();
+    initialLoadedText.clear();
     bufferDirty = false;
     emit dirtyChanged(false);
 }
 
-  bool EditorTab::eventFilter(QObject *obj, QEvent *event)
+ bool EditorTab::eventFilter(QObject *obj, QEvent *event)
 {
+    if (obj == editor && event->type() == QEvent::KeyPress) {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+        if (autoIndentEnabled && (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter)) {
+            QTextCursor cursor = editor->textCursor();
+            QString previousText = cursor.block().text();
+            QRegularExpressionMatch match = QRegularExpression("^(\\s*)").match(previousText);
+            
+            if (match.hasMatch()) {
+                QString indentation = match.captured(1);
+                cursor.insertText(indentation);
+                cursor.insertBlock();
+                return true;
+            }
+        }
+    }
+    
     if (obj == editor->viewport() && event->type() == QEvent::Wheel) {
         QWheelEvent *wheel = static_cast<QWheelEvent *>(event);
         if (wheel->modifiers() & Qt::ControlModifier) {

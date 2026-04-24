@@ -1,5 +1,6 @@
 #include "tabmanager.h"
 #include "utils.h"
+#include <QClipboard>
 #include <QFile>
 #include <QTextStream>
 #include <QFileInfo>
@@ -9,11 +10,12 @@
 #include <QFont>
 #include <QTextOption>
 #include <QTabWidget>
+#include <QMenu>
+#include <QApplication>
+#include <QDesktopServices>
 
 TabManager::TabManager(QWidget *parent)
     : QTabWidget(parent)
-    , lineInfoLabel(nullptr)
-    , lineNumbersEnabled(false)
 {
     TabBar *bar = new TabBar(this);
     setTabBar(bar);
@@ -21,6 +23,38 @@ TabManager::TabManager(QWidget *parent)
         if (index >= 0 && index < count()) {
             setCurrentIndex(index);
             closeCurrentTab();
+        }
+    });
+    connect(bar, &TabBar::closeOthersRequested, this, [this](int index) {
+        for (int i = count() - 1; i >= 0; i--) {
+            if (i != index) {
+                EditorTab *tab = static_cast<EditorTab *>(widget(i));
+                if (!closeTab(tab)) {
+                    break;
+                }
+            }
+        }
+    });
+    connect(bar, &TabBar::closeLeftRequested, this, [this](int index) {
+        for (int i = index - 1; i >= 0; i--) {
+            EditorTab *tab = static_cast<EditorTab *>(widget(i));
+            if (!closeTab(tab)) {
+                break;
+            }
+        }
+    });
+    connect(bar, &TabBar::closeRightRequested, this, [this](int index) {
+        for (int i = count() - 1; i > index; i--) {
+            EditorTab *tab = static_cast<EditorTab *>(widget(i));
+            if (!closeTab(tab)) {
+                break;
+            }
+        }
+    });
+    connect(bar, &TabBar::copyFilePathRequested, this, [this](int index) {
+        EditorTab *tab = getEditorTab(index);
+        if (tab && !tab->getFile().isEmpty()) {
+            QApplication::clipboard()->setText(tab->getFile());
         }
     });
 
@@ -55,15 +89,18 @@ EditorTab *TabManager::addTab(const QString &title)
 
 void TabManager::closeCurrentTab()
 {
-   if (count() > 1) {
+    if (count() > 1) {
+        EditorTab *tab = currentTab();
+        closeTab(tab);
+    } else {
         EditorTab *tab = currentTab();
         if (tab->isDirty()) {
-            QString fileName = tab->getFile();
-            if (fileName.isEmpty()) {
-                fileName = tr("(untitled)");
+            QString fileTitle = tab->getFile();
+            if (fileTitle.isEmpty()) {
+                fileTitle = tr("(untitled)");
             }
             int reply = QMessageBox::question(this, tr("Save Changes"),
-                tr("'%1' has unsaved changes. Do you want to save them?").arg(fileName),
+                tr("'%1' has unsaved changes. Do you want to save them?").arg(fileTitle),
                 QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
             if (reply == QMessageBox::Save) {
@@ -71,74 +108,67 @@ void TabManager::closeCurrentTab()
                 if (!file.isEmpty()) {
                     tab->saveFile(file);
                 } else {
-                    QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"),
+                    QString saveFile = QFileDialog::getSaveFileName(this, tr("Save File"),
                         QString(), tr("Text Files (*.txt)"));
-                    if (!fileName.isEmpty()) {
-                        tab->saveFile(fileName);
+                    if (!saveFile.isEmpty()) {
+                        tab->saveFile(saveFile);
                     }
                 }
                 if (tab->isDirty()) {
                     return;
                 }
-            } else if (reply == QMessageBox::Cancel) {
+            } else if (reply == QMessageBox::Discard) {
+                tab->setDirty(false);
+            } else {
                 return;
             }
         }
-        int index = QTabWidget::indexOf(tab);
-        if (index >= 0) {
-            QTabWidget::removeTab(index);
-        }
-        emit tabCountChanged(count());
-    } else {
-        EditorTab *tab = currentTab();
-        int index = QTabWidget::indexOf(tab);
-        if (index >= 0) {
-            if (tab->isDirty()) {
-                QString fileName = tab->getFile();
-                if (fileName.isEmpty()) {
-                    fileName = tr("(untitled)");
-                }
-                int reply = QMessageBox::question(this, tr("Save Changes"),
-                    tr("'%1' has unsaved changes. Do you want to save them?").arg(fileName),
-                    QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
-
-                if (reply == QMessageBox::Save) {
-                    QString file = tab->getFile();
-                    if (!file.isEmpty()) {
-                        tab->saveFile(file);
-                    } else {
-                        QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"),
-                            QString(), tr("Text Files (*.txt)"));
-                        if (!fileName.isEmpty()) {
-                            tab->saveFile(fileName);
-                        }
-                    }
-                    if (tab->isDirty()) {
-                        return;
-                    }
-                } else if (reply == QMessageBox::Cancel) {
-                    return;
-                }
-            }
-            QTabWidget::removeTab(index);
-            emit tabCountChanged(count());
-        }
-        addTab(tr("(untitled)"));
+        tab->clear();
+        updateCurrentTabTitle();
     }
 }
 
 bool TabManager::closeTab(EditorTab *tab)
 {
-    if (tab == currentTab() && count() > 1) {
-        return true;
-    }
     int index = QTabWidget::indexOf(tab);
-    if (index >= 0) {
-        QTabWidget::removeTab(index);
-        emit tabCountChanged(count());
-        return true;
+    if (index < 0) {
+        return false;
     }
-    return false;
+
+    if (tab->isDirty()) {
+        QString fileTitle = tab->getFile();
+        if (fileTitle.isEmpty()) {
+            fileTitle = tr("(untitled)");
+        }
+        int reply = QMessageBox::question(this, tr("Save Changes"),
+            tr("'%1' has unsaved changes. Do you want to save them?").arg(fileTitle),
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+
+        if (reply == QMessageBox::Save) {
+            QString file = tab->getFile();
+            if (!file.isEmpty()) {
+                tab->saveFile(file);
+            } else {
+                QString saveFile = QFileDialog::getSaveFileName(this, tr("Save File"),
+                    QString(), tr("Text Files (*.txt)"));
+                if (!saveFile.isEmpty()) {
+                    tab->saveFile(saveFile);
+                }
+            }
+            if (tab->isDirty()) {
+                return false;
+            }
+        } else if (reply == QMessageBox::Discard) {
+            tab->setDirty(false);
+        } else {
+            return false;
+        }
+    }
+
+    QTabWidget::removeTab(index);
+    tab->deleteLater();
+    emit tabCountChanged(count());
+    return true;
 }
 
 int TabManager::count() const
@@ -367,13 +397,54 @@ void TabManager::setupFont(const QFont &font)
     currentFont = font;
 }
 
-void TabManager::setupLineNumbers(bool enable)
+void TabBar::mousePressEvent(QMouseEvent *event)
 {
-    lineNumbersEnabled = enable;
-    for (int i = 0; i < count(); i++) {
-        EditorTab *tab = static_cast<EditorTab *>(widget(i));
-        if (tab) {
-            tab->getLineNumberWidget()->setVisible(enable);
+    if (event->button() == Qt::MiddleButton) {
+        int tab = tabAt(event->pos());
+        if (tab >= 0) {
+            emit closeRequested(tab);
+            return;
         }
+    }
+    QTabBar::mousePressEvent(event);
+}
+
+void TabBar::mouseMoveEvent(QMouseEvent *event)
+{
+    QTabBar::mouseMoveEvent(event);
+}
+
+void TabBar::mouseReleaseEvent(QMouseEvent *event)
+{
+    QTabBar::mouseReleaseEvent(event);
+}
+
+void TabBar::contextMenuEvent(QContextMenuEvent *event)
+{
+    int tab = tabAt(event->pos());
+    if (tab < 0) {
+        return;
+    }
+
+    QMenu contextMenu;
+    QAction *closeThis = contextMenu.addAction(tr("Close Tab"));
+    QAction *closeLeft = contextMenu.addAction(tr("Close Tabs to the Left"));
+    QAction *closeOthers = contextMenu.addAction(tr("Close Other Tabs"));
+    QAction *closeRight = contextMenu.addAction(tr("Close Tabs to the Right"));
+    contextMenu.addSeparator();
+    QAction *copyPath = contextMenu.addAction(tr("Copy File Path"));
+
+    QAction *selected = contextMenu.exec(event->globalPos());
+
+    if (selected == closeThis) {
+        emit closeRequested(tab);
+    } else if (selected == closeLeft) {
+        emit closeLeftRequested(tab);
+    } else if (selected == closeOthers) {
+        emit closeOthersRequested(tab);
+    } else if (selected == closeRight) {
+        emit closeRightRequested(tab);
+    } else if (selected == copyPath) {
+        emit copyFilePathRequested(tab);
     }
 }

@@ -24,6 +24,11 @@
 #include <QCloseEvent>
 #include <QResizeEvent>
 #include <QUrl>
+#include <QDrag>
+#include <QMimeData>
+#include <QRegularExpression>
+#include <QRegularExpressionMatch>
+#include <QClipboard>
 
 Qwenpad::Qwenpad(QWidget *parent)
     : QMainWindow(parent)
@@ -62,8 +67,9 @@ Qwenpad::Qwenpad(QWidget *parent)
     , goToLineEdit(nullptr)
     , goToLineAction(nullptr)
     , previousEditor(nullptr)
-    , bufferDirty(false)
+    ,    bufferDirty(false)
     , wordWrapEnabled(true)
+    , untitledTabCount(0)
     , currentLineEndingType(0)
 {
     setMinimumSize(620, 400);
@@ -342,17 +348,20 @@ void Qwenpad::setupFindDialog()
     replaceLineEdit->setPlaceholderText(tr("Enter replacement text (optional)..."));
     layout->addWidget(replaceLineEdit, 1, 0);
 
+    regexCheckBox = new QCheckBox(tr("Use Regular Expressions"));
+    layout->addWidget(regexCheckBox, 2, 0);
+
     findNextButton = new QPushButton(tr("Find Next"));
-    layout->addWidget(findNextButton, 2, 0);
+    layout->addWidget(findNextButton, 3, 0);
 
     replaceButton = new QPushButton(tr("Replace"));
-    layout->addWidget(replaceButton, 3, 0);
+    layout->addWidget(replaceButton, 4, 0);
 
     replaceAllButton = new QPushButton(tr("Replace All"));
-    layout->addWidget(replaceAllButton, 4, 0);
+    layout->addWidget(replaceAllButton, 5, 0);
 
     closeButton = new QPushButton(tr("Close"));
-    layout->addWidget(closeButton, 5, 0);
+    layout->addWidget(closeButton, 6, 0);
 
     connect(findNextButton, &QPushButton::clicked, this, &Qwenpad::onFindNext);
     connect(replaceButton, &QPushButton::clicked, this, &Qwenpad::onReplace);
@@ -369,6 +378,11 @@ void Qwenpad::onNew()
 
 void Qwenpad::openFiles(const QStringList &files)
 {
+    if (files.isEmpty()) {
+        restoreSession();
+        return;
+    }
+
     for (const QString &fileName : files) {
         QString path = QUrl(fileName).toLocalFile();
         if (path.isEmpty()) {
@@ -391,37 +405,30 @@ void Qwenpad::openFiles(const QStringList &files)
         tabManager->updateCurrentTabTitle();
     }
 
-    if (!files.isEmpty()) {
-        detectLineEndings();
+    detectLineEndings();
 
-        QSettings settings("Qwenpad", "Qwenpad");
-        if (settings.contains("FontFamily")) {
-            QFont restoredFont;
-            restoredFont.setFamily(settings.value("FontFamily").toString());
-            restoredFont.setPointSize(settings.value("FontSize").toInt());
-            tabManager->setupFont(restoredFont);
-        }
-        if (settings.contains("WordWrapEnabled")) {
-            wrapAction->setChecked(settings.value("WordWrapEnabled").toBool());
-            onWrap();
-        }
-        if (settings.contains("LineEndingType")) {
-            int lineEndingType = settings.value("LineEndingType").toInt();
-            if (lineEndingType == 1) {
-                currentLineEndingType = 1;
-                onStatusLineEndingClicked();
-            } else if (lineEndingType == 2) {
-                currentLineEndingType = 2;
-                onStatusLineEndingClicked();
-            } else {
-                currentLineEndingType = 0;
-                onStatusLineEndingClicked();
-            }
-        }
-        if (settings.contains("HighlighterLanguage")) {
-            QString savedLanguage = settings.value("HighlighterLanguage").toString();
-            onStatusLanguageClicked();
-            currentHighlighterLanguage = savedLanguage;
+    QSettings settings("Qwenpad", "Qwenpad");
+    if (settings.contains("FontFamily")) {
+        QFont restoredFont;
+        restoredFont.setFamily(settings.value("FontFamily").toString());
+        restoredFont.setPointSize(settings.value("FontSize").toInt());
+        tabManager->setupFont(restoredFont);
+    }
+    if (settings.contains("WordWrapEnabled")) {
+        wrapAction->setChecked(settings.value("WordWrapEnabled").toBool());
+        onWrap();
+    }
+    if (settings.contains("LineEndingType")) {
+        int lineEndingType = settings.value("LineEndingType").toInt();
+        tabManager->convertLineEndings(lineEndingType);
+        currentLineEndingType = lineEndingType;
+    }
+    if (settings.contains("HighlighterLanguage")) {
+        QString savedLanguage = settings.value("HighlighterLanguage").toString();
+        currentHighlighterLanguage = savedLanguage;
+        EditorTab *tab = tabManager->currentTab();
+        if (tab) {
+            tab->setHighlighterLanguage(savedLanguage);
         }
     }
 }
@@ -545,6 +552,8 @@ void Qwenpad::resizeEvent(QResizeEvent *event)
 
 void Qwenpad::closeEvent(QCloseEvent *event)
 {
+    saveSession();
+
     bool allSaved = true;
     for (int i = 0; i < tabManager->count(); i++) {
         EditorTab *tab = tabManager->getEditorTab(i);
@@ -594,9 +603,29 @@ void Qwenpad::onFindNext()
         return;
     }
 
-    bool found = tabManager->findNext(searchText);
-    if (!found) {
-        QMessageBox::information(findDialog, tr("Find"), tr("Text not found"));
+    bool useRegex = regexCheckBox->isChecked();
+   if (useRegex) {
+        QTextEdit *editor = currentEditor();
+        if (!editor) return;
+
+        QRegularExpression regex(searchText);
+        QString documentText = editor->document()->toPlainText();
+        int startPos = editor->textCursor().position();
+        QRegularExpressionMatch match = regex.match(documentText, startPos);
+        if (match.hasMatch()) {
+            QTextCursor selCursor(editor->document());
+            selCursor.setPosition(match.capturedStart());
+            selCursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor, match.capturedLength());
+            editor->setTextCursor(selCursor);
+            editor->ensureCursorVisible();
+        } else {
+            QMessageBox::information(findDialog, tr("Find"), tr("Text not found"));
+        }
+    } else {
+        bool found = tabManager->findNext(searchText);
+        if (!found) {
+            QMessageBox::information(findDialog, tr("Find"), tr("Text not found"));
+        }
     }
 }
 
@@ -610,9 +639,30 @@ void Qwenpad::onReplace()
         return;
     }
 
-    bool found = tabManager->replace(searchText, replaceText);
-    if (!found) {
-        QMessageBox::information(findDialog, tr("Replace"), tr("Text not found"));
+   bool useRegex = regexCheckBox->isChecked();
+    if (useRegex) {
+        QTextEdit *editor = currentEditor();
+        if (!editor) return;
+
+        QRegularExpression regex(searchText);
+        QString content = editor->toPlainText();
+        int startPos = editor->textCursor().position();
+        QRegularExpressionMatch match = regex.match(content, startPos);
+        if (match.hasMatch()) {
+            QTextCursor cursor(editor->document());
+            cursor.setPosition(startPos);
+            cursor.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor, 1);
+            cursor.insertText(replaceText);
+            editor->setTextCursor(cursor);
+            editor->ensureCursorVisible();
+        } else {
+            QMessageBox::information(findDialog, tr("Replace"), tr("Text not found"));
+        }
+    } else {
+        bool found = tabManager->replace(searchText, replaceText);
+        if (!found) {
+            QMessageBox::information(findDialog, tr("Replace"), tr("Text not found"));
+        }
     }
 }
 
@@ -626,9 +676,27 @@ void Qwenpad::onReplaceAll()
         return;
     }
 
-    int count = tabManager->replaceAll(searchText, replaceText);
-    if (count == 0) {
-        QMessageBox::information(findDialog, tr("Replace All"), tr("Text not found"));
+    bool useRegex = regexCheckBox->isChecked();
+    if (useRegex) {
+        QTextEdit *editor = currentEditor();
+        if (!editor) return;
+
+        QRegularExpression regex(searchText);
+        QString content = editor->toPlainText();
+        int count = content.count(regex);
+
+        if (count > 0) {
+            QString replaced = content.replace(regex, replaceText);
+            editor->setPlainText(replaced);
+            tabManager->updateCurrentTabTitle();
+        } else {
+            QMessageBox::information(findDialog, tr("Replace All"), tr("Text not found"));
+        }
+    } else {
+        int count = tabManager->replaceAll(searchText, replaceText);
+        if (count == 0) {
+            QMessageBox::information(findDialog, tr("Replace All"), tr("Text not found"));
+        }
     }
 }
 
@@ -653,25 +721,29 @@ bool Qwenpad::askSave(EditorTab *tab)
         QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
 
     if (reply == QMessageBox::Save) {
-        QString fileName = tab->getFile();
-        if (!fileName.isEmpty()) {
-            tab->saveFile(fileName);
-            return true;
+        QString file = tab->getFile();
+        if (!file.isEmpty()) {
+            tab->saveFile(file);
         } else {
             QString savedFile = QFileDialog::getSaveFileName(this, tr("Save File"),
                 QString(), tr("Text Files (*.txt)"));
             if (!savedFile.isEmpty()) {
                 tab->saveFile(savedFile);
-                return true;
             } else {
                 return false;
             }
         }
+        if (tab->isDirty()) {
+            return false;
+        }
+        tabManager->updateCurrentTabTitle();
+        return true;
     } else if (reply == QMessageBox::Cancel) {
         return false;
     }
 
     tab->setDirty(false);
+    tabManager->updateCurrentTabTitle();
     return true;
 }
 
@@ -679,8 +751,8 @@ void Qwenpad::onCurrentTabChanged()
 {
     QTextEdit *editor = currentEditor();
     if (previousEditor) {
-        disconnect(previousEditor->document(), &QTextDocument::undoAvailable, undoAction, nullptr);
-        disconnect(previousEditor->document(), &QTextDocument::redoAvailable, redoAction, nullptr);
+        disconnect(previousEditor->document(), &QTextDocument::undoAvailable, this, nullptr);
+        disconnect(previousEditor->document(), &QTextDocument::redoAvailable, this, nullptr);
     }
 
     if (editor) {
@@ -775,7 +847,6 @@ void Qwenpad::onZoomIn()
     EditorTab *tab = tabManager->currentTab();
     if (tab && tab->getEditor()) {
         tab->getEditor()->zoomIn();
-        tab->getLineNumberWidget()->setFont(tab->getEditor()->font());
     }
 }
 
@@ -784,7 +855,6 @@ void Qwenpad::onZoomOut()
     EditorTab *tab = tabManager->currentTab();
     if (tab && tab->getEditor()) {
         tab->getEditor()->zoomOut();
-        tab->getLineNumberWidget()->setFont(tab->getEditor()->font());
     }
 }
 
@@ -829,7 +899,7 @@ void Qwenpad::onStatusLanguageClicked()
     updateStatusBar();
 }
 
-void Qwenpad::updateStatusBar()
+ void Qwenpad::updateStatusBar()
 {
     EditorTab *tab = tabManager->currentTab();
     if (!tab) {
@@ -845,8 +915,19 @@ void Qwenpad::updateStatusBar()
         statusLineEndingLabel->setText(tr("CR"));
     }
 
-    currentHighlighterLanguage = "Text";
-    if (tab->getEditor()->document()->blockCount() > 0) {
+    currentHighlighterLanguage = tab->getHighlighterLanguage();
+
+    QString fileName = tab->getFile();
+    if (!fileName.isEmpty()) {
+        if (fileName.contains("cpp") || fileName.contains("hpp") ||
+            fileName.endsWith(".c") || fileName.endsWith(".h")) {
+            currentHighlighterLanguage = "C++";
+        } else if (fileName.endsWith(".py") || fileName.endsWith(".pyw")) {
+            currentHighlighterLanguage = "Python";
+        }
+    }
+
+    if (tab->getEditor()->document()->blockCount() > 0 && currentHighlighterLanguage == "Text") {
         QTextBlock block = tab->getEditor()->document()->firstBlock();
         QString text = block.text().trimmed();
         if (text.startsWith("#!")) {
@@ -854,13 +935,6 @@ void Qwenpad::updateStatusBar()
             if (shebang.contains("python")) {
                 currentHighlighterLanguage = "Python";
             }
-        }
-        QString fileName = tab->getFile();
-        if (fileName.contains("cpp") || fileName.contains("hpp") ||
-            fileName.endsWith(".c") || fileName.endsWith(".h")) {
-            currentHighlighterLanguage = "C++";
-        } else if (fileName.endsWith(".py") || fileName.endsWith(".pyw")) {
-            currentHighlighterLanguage = "Python";
         }
     }
 
@@ -873,4 +947,83 @@ void Qwenpad::updateStatusBar()
     } else {
         statusLanguageLabel->setText(tr("Text"));
     }
+}
+
+void Qwenpad::dragEnterEvent(QDragEnterEvent *event)
+{
+    if (event->mimeData()->hasUrls()) {
+        bool isFile = true;
+        for (const QUrl &url : event->mimeData()->urls()) {
+            QString localPath = url.toLocalFile();
+            if (localPath.isEmpty() || !QFile::exists(localPath)) {
+                isFile = false;
+                break;
+            }
+        }
+        if (isFile) {
+            event->acceptProposedAction();
+        }
+    } else {
+        event->ignore();
+    }
+}
+
+void Qwenpad::dropEvent(QDropEvent *event)
+{
+    if (event->mimeData()->hasUrls()) {
+        QStringList files;
+        for (const QUrl &url : event->mimeData()->urls()) {
+            files.append(url.toLocalFile());
+        }
+        openFiles(files);
+        event->acceptProposedAction();
+    }
+}
+
+void Qwenpad::keyPressEvent(QKeyEvent *event)
+{
+    QMainWindow::keyPressEvent(event);
+}
+
+  void Qwenpad::saveSession()
+{
+    QSettings settings("Qwenpad", "Qwenpad");
+    QStringList files;
+    int untitledCount = 0;
+    for (int i = 0; i < tabManager->count(); i++) {
+        EditorTab *tab = tabManager->getEditorTab(i);
+        if (tab && !tab->getFile().isEmpty()) {
+            files.append(tab->getFile());
+        } else if (tab) {
+            untitledCount++;
+        }
+    }
+    settings.setValue("SessionFiles", files);
+    settings.setValue("SessionUntitledCount", untitledCount);
+}
+
+ void Qwenpad::restoreSession()
+{
+    QSettings settings("Qwenpad", "Qwenpad");
+    if (settings.contains("SessionFiles")) {
+        QStringList files = settings.value("SessionFiles").toStringList();
+        if (!files.isEmpty()) {
+            openFiles(files);
+        }
+    }
+    if (settings.contains("SessionUntitledCount")) {
+        int untitledCount = settings.value("SessionUntitledCount").toInt();
+        for (int i = 0; i < untitledCount; i++) {
+            tabManager->addTab(tr("(untitled)"));
+        }
+    }
+}
+
+QStringList Qwenpad::getSessionFiles()
+{
+    QSettings settings("Qwenpad", "Qwenpad");
+    if (settings.contains("SessionFiles")) {
+        return settings.value("SessionFiles").toStringList();
+    }
+    return QStringList();
 }

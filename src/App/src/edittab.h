@@ -5,7 +5,7 @@
 #include <QTextEdit>
 #include <QString>
 #include <QEvent>
-#include "lineeditwidget.h"
+#include <QKeyEvent>
 #include "syntaxhighlighter.h"
 
 class EditorTab : public QWidget
@@ -22,11 +22,13 @@ public:
     void setDirty(bool dirty);
     void setLineEndingType(int type);
     int getLineEndingType() const;
-    LineEditWidget *getLineNumberWidget() const;
+    bool getAutoIndentEnabled() const;
+    void setAutoIndentEnabled(bool enabled);
 
     void setupEditor();
     void loadFile(const QString &fileName);
     void setHighlighterLanguage(const QString &language);
+    QString getHighlighterLanguage() const;
     void saveFile(const QString &fileName);
     void clear();
 
@@ -38,11 +40,12 @@ signals:
 
 private:
     QTextEdit *editor;
-    LineEditWidget *lineNumberWidget;
     SyntaxHighlighter *highlighter;
     QString currentFile;
+    QString initialLoadedText;
     bool bufferDirty;
     int lineEndingType;
+    bool autoIndentEnabled;
 };
 
 #endif // EDITORTAB_H

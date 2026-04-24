@@ -8,6 +8,7 @@
 #include <QTextCursor>
 #include <QFont>
 #include <QString>
+#include <QContextMenuEvent>
 #include "edittab.h"
 
 class TabBar : public QTabBar
@@ -18,31 +19,17 @@ public:
     explicit TabBar(QWidget *parent = nullptr) : QTabBar(parent) {}
 
 protected:
-    void mousePressEvent(QMouseEvent *event) override
-    {
-        if (event->button() == Qt::MiddleButton) {
-            int tab = tabAt(event->pos());
-            if (tab >= 0) {
-                emit closeRequested(tab);
-                return;
-            }
-        }
-        QTabBar::mousePressEvent(event);
-    }
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
 
 signals:
     void closeRequested(int index);
-
-private:
-    void mouseReleaseEvent(QMouseEvent *event) override
-    {
-        QTabBar::mouseReleaseEvent(event);
-    }
-
-    void mouseMoveEvent(QMouseEvent *event) override
-    {
-        QTabBar::mouseMoveEvent(event);
-    }
+    void closeOthersRequested(int index);
+    void closeLeftRequested(int index);
+    void closeRightRequested(int index);
+    void copyFilePathRequested(int index);
 };
 
 class TabManager : public QTabWidget
@@ -76,7 +63,6 @@ public:
     void convertLineEndings(int targetType);
 
     void setupFont(const QFont &font);
-    void setupLineNumbers(bool enable);
 
 signals:
     void tabCountChanged(int count);
@@ -84,11 +70,7 @@ signals:
     void tabCloseRequested(int index);
 
 private:
-    void updateLineInfo();
-
-    QLabel *lineInfoLabel;
     QFont currentFont;
-    bool lineNumbersEnabled;
 };
 
 #endif // TABMANAGER_H

@@ -13,10 +13,11 @@ class SyntaxHighlighter : public QSyntaxHighlighter
     Q_OBJECT
 
 public:
-    explicit SyntaxHighlighter(QTextDocument *parent = nullptr);
+explicit SyntaxHighlighter(QTextDocument *parent = nullptr);
     void setLanguage(const QString &language);
+    QString getLanguage() const;
 
-private:
+ private:
     void highlightBlock(const QString &text) override;
 
     struct HighlightingRule
@@ -26,6 +27,7 @@ private:
     };
 
     QVector<HighlightingRule> rules;
+    QString currentLanguage;
     QHash<QString, QVector<HighlightingRule>> languageRules;
     void addCPPRules();
     void addPythonRules();
