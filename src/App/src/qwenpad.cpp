@@ -226,7 +226,6 @@ void Qwenpad::setupMenuBar()
         connect(zoomOutAction, &QAction::triggered, this, &Qwenpad::onZoomOut);
         viewMenu->addAction(zoomOutAction);
     }
-    viewMenu->addSeparator();
     viewMenu->addSection(tr("Syntax Highlighting"));
 
     auto *syntaxGroup = new QActionGroup(this);
@@ -307,8 +306,11 @@ void Qwenpad::setupToolBar()
     statusLineEndingLabel->setFlat(true);
     QMenu *leMenu = new QMenu(this);
     QAction *leLf = leMenu->addAction(tr("LF (Unix)"));
+    leLf->setData("LF");
     QAction *leCrlf = leMenu->addAction(tr("CRLF (Windows)"));
+    leCrlf->setData("CRLF");
     QAction *leCr = leMenu->addAction(tr("CR (Mac)"));
+    leCr->setData("CR");
     connect(leLf, &QAction::triggered, this, &Qwenpad::onStatusLineEndingClicked);
     connect(leCrlf, &QAction::triggered, this, &Qwenpad::onStatusLineEndingClicked);
     connect(leCr, &QAction::triggered, this, &Qwenpad::onStatusLineEndingClicked);
@@ -320,11 +322,23 @@ void Qwenpad::setupToolBar()
     statusLanguageLabel->setFlat(true);
     QMenu *langMenu = new QMenu(this);
     QAction *langNone = langMenu->addAction(tr("None"));
+    langNone->setData("Text");
     QAction *langCpp = langMenu->addAction(tr("C/C++"));
+    langCpp->setData("C++");
     QAction *langPy = langMenu->addAction(tr("Python"));
+    langPy->setData("Python");
+    QAction *langJson = langMenu->addAction(tr("JSON"));
+    langJson->setData("JSON");
+    QAction *langShell = langMenu->addAction(tr("Shell"));
+    langShell->setData("Shell");
+    QAction *langXml = langMenu->addAction(tr("XML/HTML"));
+    langXml->setData("XML");
     connect(langNone, &QAction::triggered, this, &Qwenpad::onStatusLanguageClicked);
     connect(langCpp, &QAction::triggered, this, &Qwenpad::onStatusLanguageClicked);
     connect(langPy, &QAction::triggered, this, &Qwenpad::onStatusLanguageClicked);
+    connect(langJson, &QAction::triggered, this, &Qwenpad::onStatusLanguageClicked);
+    connect(langShell, &QAction::triggered, this, &Qwenpad::onStatusLanguageClicked);
+    connect(langXml, &QAction::triggered, this, &Qwenpad::onStatusLanguageClicked);
     langMenu->setStyleSheet("QMenu { border: none; }");
     statusLanguageLabel->setMenu(langMenu);
     statusBar()->addPermanentWidget(statusLanguageLabel);
@@ -603,8 +617,8 @@ void Qwenpad::onFindNext()
         return;
     }
 
-    bool useRegex = regexCheckBox->isChecked();
-   if (useRegex) {
+   bool useRegex = regexCheckBox->isChecked();
+    if (useRegex) {
         QTextEdit *editor = currentEditor();
         if (!editor) return;
 
@@ -612,6 +626,12 @@ void Qwenpad::onFindNext()
         QString documentText = editor->document()->toPlainText();
         int startPos = editor->textCursor().position();
         QRegularExpressionMatch match = regex.match(documentText, startPos);
+        if (!match.hasMatch()) {
+            match = regex.match(documentText);
+            if (match.hasMatch()) {
+                startPos = 0;
+            }
+        }
         if (match.hasMatch()) {
             QTextCursor selCursor(editor->document());
             selCursor.setPosition(match.capturedStart());
@@ -639,24 +659,35 @@ void Qwenpad::onReplace()
         return;
     }
 
-   bool useRegex = regexCheckBox->isChecked();
+    bool useRegex = regexCheckBox->isChecked();
     if (useRegex) {
         QTextEdit *editor = currentEditor();
         if (!editor) return;
 
+        QTextCursor cursor = editor->textCursor();
+        QString selectedText = cursor.selectedText();
+
         QRegularExpression regex(searchText);
-        QString content = editor->toPlainText();
-        int startPos = editor->textCursor().position();
-        QRegularExpressionMatch match = regex.match(content, startPos);
-        if (match.hasMatch()) {
-            QTextCursor cursor(editor->document());
-            cursor.setPosition(match.capturedStart());
-            cursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor, match.capturedLength());
+        if (!selectedText.isEmpty() && regex.match(selectedText).hasMatch()) {
             cursor.insertText(replaceText);
             editor->setTextCursor(cursor);
             editor->ensureCursorVisible();
         } else {
-            QMessageBox::information(findDialog, tr("Replace"), tr("Text not found"));
+            QString content = editor->toPlainText();
+            QRegularExpressionMatch match = regex.match(content, cursor.position());
+            if (!match.hasMatch()) {
+                match = regex.match(content);
+            }
+            if (match.hasMatch()) {
+                QTextCursor selCursor(editor->document());
+                selCursor.setPosition(match.capturedStart());
+                selCursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor, match.capturedLength());
+                selCursor.insertText(replaceText);
+                editor->setTextCursor(selCursor);
+                editor->ensureCursorVisible();
+            } else {
+                QMessageBox::information(findDialog, tr("Replace"), tr("Text not found"));
+            }
         }
     } else {
         bool found = tabManager->replace(searchText, replaceText);
@@ -767,6 +798,7 @@ void Qwenpad::onCurrentTabChanged()
         connect(doc, &QTextDocument::redoAvailable, this, [this](bool available) {
             redoAction->setEnabled(available);
         });
+        connect(doc, &QTextDocument::undoAvailable, this, &Qwenpad::detectLanguage);
 
         undoAction->setEnabled(doc->isUndoAvailable());
         redoAction->setEnabled(doc->isRedoAvailable());
@@ -865,14 +897,14 @@ void Qwenpad::onZoomOut()
 void Qwenpad::onStatusLineEndingClicked()
 {
     QAction *action = static_cast<QAction *>(sender());
-    QString text = action->text();
-    if (text.contains("LF (Unix)")) {
+    QString id = action->data().toString();
+    if (id == "LF") {
         tabManager->convertLineEndings(0);
         currentLineEndingType = 0;
-    } else if (text.contains("CRLF (Windows)")) {
+    } else if (id == "CRLF") {
         tabManager->convertLineEndings(1);
         currentLineEndingType = 1;
-    } else if (text.contains("CR (Mac)")) {
+    } else if (id == "CR") {
         tabManager->convertLineEndings(2);
         currentLineEndingType = 2;
     }
@@ -881,30 +913,45 @@ void Qwenpad::onStatusLineEndingClicked()
     updateStatusBar();
 }
 
-void Qwenpad::onStatusLanguageClicked()
+  void Qwenpad::onStatusLanguageClicked()
 {
     QAction *action = static_cast<QAction *>(sender());
-    QString text = action->text();
+    QString language = action->data().toString();
     EditorTab *tab = tabManager->currentTab();
     if (!tab) {
         return;
     }
 
-    if (text == "None") {
-        tab->setHighlighterLanguage("Text");
-        currentHighlighterLanguage = "Text";
-    } else if (text == "C/C++") {
-        tab->setHighlighterLanguage("C++");
-        currentHighlighterLanguage = "C++";
-    } else if (text == "Python") {
-        tab->setHighlighterLanguage("Python");
-        currentHighlighterLanguage = "Python";
-    }
+    tab->setHighlighterLanguage(language);
+    currentHighlighterLanguage = language;
     updateStatusBar();
 }
 
- void Qwenpad::updateStatusBar()
+  void Qwenpad::detectLanguage()
 {
+    EditorTab *tab = tabManager->currentTab();
+    if (!tab) return;
+
+    if (tab->getEditor()->document()->blockCount() > 0 && tab->getHighlighterLanguage() == "Text") {
+        QTextBlock block = tab->getEditor()->document()->firstBlock();
+        QString text = block.text().trimmed();
+        if (text.startsWith("#!")) {
+            if (text.contains("python")) {
+                tab->setHighlighterLanguage("Python");
+                currentHighlighterLanguage = "Python";
+                statusLanguageLabel->setText(tr("Python"));
+            } else if (text.contains("bash") || text.contains("sh") || text.contains("zsh")) {
+                tab->setHighlighterLanguage("Shell");
+                currentHighlighterLanguage = "Shell";
+                statusLanguageLabel->setText(tr("Shell"));
+            }
+        }
+    }
+}
+
+  void Qwenpad::updateStatusBar()
+{
+
     EditorTab *tab = tabManager->currentTab();
     if (!tab) {
         return;
@@ -928,6 +975,12 @@ void Qwenpad::onStatusLanguageClicked()
             currentHighlighterLanguage = "C++";
         } else if (extension == "py" || extension == "pyw") {
             currentHighlighterLanguage = "Python";
+        } else if (extension == "json") {
+            currentHighlighterLanguage = "JSON";
+        } else if (extension == "sh" || extension == "bash" || extension == "zsh") {
+            currentHighlighterLanguage = "Shell";
+        } else if (extension == "xml" || extension == "html" || extension == "htm" || extension == "xhtml") {
+            currentHighlighterLanguage = "XML";
         }
     }
 
@@ -935,12 +988,15 @@ void Qwenpad::onStatusLanguageClicked()
         QTextBlock block = tab->getEditor()->document()->firstBlock();
         QString text = block.text().trimmed();
         if (text.startsWith("#!")) {
-            QString shebang = text;
-            if (shebang.contains("python")) {
+            if (text.contains("python")) {
                 currentHighlighterLanguage = "Python";
+            } else if (text.contains("bash") || text.contains("sh") || text.contains("zsh")) {
+                currentHighlighterLanguage = "Shell";
             }
         }
     }
+
+    tab->setHighlighterLanguage(currentHighlighterLanguage);
 
     if (currentHighlighterLanguage == "Text") {
         statusLanguageLabel->setText(tr("Text"));
@@ -948,9 +1004,17 @@ void Qwenpad::onStatusLanguageClicked()
         statusLanguageLabel->setText(tr("C/C++"));
     } else if (currentHighlighterLanguage == "Python") {
         statusLanguageLabel->setText(tr("Python"));
+    } else if (currentHighlighterLanguage == "JSON") {
+        statusLanguageLabel->setText(tr("JSON"));
+    } else if (currentHighlighterLanguage == "Shell") {
+        statusLanguageLabel->setText(tr("Shell"));
+    } else if (currentHighlighterLanguage == "XML") {
+        statusLanguageLabel->setText(tr("XML/HTML"));
     } else {
         statusLanguageLabel->setText(tr("Text"));
     }
+
+    detectLanguage();
 }
 
 void Qwenpad::dragEnterEvent(QDragEnterEvent *event)

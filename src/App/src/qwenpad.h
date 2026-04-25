@@ -45,6 +45,7 @@ private slots:
     void onGoToLine();
     void updateLineInfo();
     void detectLineEndings();
+    void detectLanguage();
     void onConvertCrlf();
     void onConvertLf();
     void onConvertCr();

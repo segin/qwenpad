@@ -90,29 +90,35 @@ void EditorTab::setupEditor()
     layout->addWidget(editor);
 }
 
-void EditorTab::loadFile(const QString &fileName)
-{
-    QFile file(fileName);
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QTextStream stream(&file);
-        QString content = stream.readAll();
-        file.close();
-        editor->setPlainText(content);
-        currentFile = fileName;
-        initialLoadedText = content;
-        bufferDirty = false;
-        emit dirtyChanged(false);
+   void EditorTab::loadFile(const QString &fileName)
+    {
+        QFile file(fileName);
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QTextStream stream(&file);
+            QString content = stream.readAll();
+            file.close();
+            editor->setPlainText(content);
+            currentFile = fileName;
+            initialLoadedText = content;
+            bufferDirty = false;
+            emit dirtyChanged(false);
 
-        QString extension = QFileInfo(fileName).suffix().toLower();
-        if (extension == "cpp" || extension == "hpp" || extension == "h" || extension == "c") {
-            highlighter->setLanguage("C++");
-        } else if (extension == "py" || extension == "pyw") {
-            highlighter->setLanguage("Python");
-        } else {
-            highlighter->setLanguage("Text");
+            QString extension = QFileInfo(fileName).suffix().toLower();
+            if (extension == "cpp" || extension == "hpp" || extension == "h" || extension == "c") {
+                highlighter->setLanguage("C++");
+            } else if (extension == "py" || extension == "pyw") {
+                highlighter->setLanguage("Python");
+            } else if (extension == "json") {
+                highlighter->setLanguage("JSON");
+            } else if (extension == "sh" || extension == "bash" || extension == "zsh") {
+                highlighter->setLanguage("Shell");
+            } else if (extension == "xml" || extension == "html" || extension == "htm" || extension == "xhtml") {
+                highlighter->setLanguage("XML");
+            } else {
+                highlighter->setLanguage("Text");
+            }
         }
     }
-}
 
 void EditorTab::saveFile(const QString &fileName)
 {
@@ -129,6 +135,7 @@ void EditorTab::saveFile(const QString &fileName)
         initialLoadedText = content;
         bufferDirty = false;
         emit dirtyChanged(false);
+        editor->document()->setModified(false);
     }
 }
 
