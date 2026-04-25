@@ -71,6 +71,7 @@ Qwenpad::Qwenpad(QWidget *parent)
     , wordWrapEnabled(true)
     , untitledTabCount(0)
     , currentLineEndingType(0)
+    , detectLanguageTimer(nullptr)
 {
     setMinimumSize(620, 400);
     setupUI();
@@ -668,10 +669,33 @@ void Qwenpad::onReplace()
         QString selectedText = cursor.selectedText();
 
         QRegularExpression regex(searchText);
-        if (!selectedText.isEmpty() && regex.match(selectedText).hasMatch()) {
-            cursor.insertText(replaceText);
-            editor->setTextCursor(cursor);
-            editor->ensureCursorVisible();
+        if (!selectedText.isEmpty()) {
+            QRegularExpressionMatch match = regex.match(selectedText);
+            if (match.hasMatch()) {
+                QTextCursor newCursor = cursor;
+                int matchStart = cursor.selectionStart() + match.capturedStart();
+                newCursor.setPosition(matchStart);
+                newCursor.setPosition(matchStart + match.capturedLength(), QTextCursor::KeepAnchor);
+                newCursor.insertText(replaceText);
+                editor->setTextCursor(newCursor);
+                editor->ensureCursorVisible();
+            } else {
+                QString content = editor->toPlainText();
+                QRegularExpressionMatch match = regex.match(content, cursor.position());
+                if (!match.hasMatch()) {
+                    match = regex.match(content);
+                }
+                if (match.hasMatch()) {
+                    QTextCursor selCursor(editor->document());
+                    selCursor.setPosition(match.capturedStart());
+                    selCursor.movePosition(QTextCursor::End, QTextCursor::KeepAnchor, match.capturedLength());
+                    selCursor.insertText(replaceText);
+                    editor->setTextCursor(selCursor);
+                    editor->ensureCursorVisible();
+                } else {
+                    QMessageBox::information(findDialog, tr("Replace"), tr("Text not found"));
+                }
+            }
         } else {
             QString content = editor->toPlainText();
             QRegularExpressionMatch match = regex.match(content, cursor.position());
@@ -782,7 +806,7 @@ bool Qwenpad::askSave(EditorTab *tab)
     return true;
 }
 
-void Qwenpad::onCurrentTabChanged()
+  void Qwenpad::onCurrentTabChanged()
 {
     QTextEdit *editor = currentEditor();
     if (previousEditor) {
@@ -798,7 +822,15 @@ void Qwenpad::onCurrentTabChanged()
         connect(doc, &QTextDocument::redoAvailable, this, [this](bool available) {
             redoAction->setEnabled(available);
         });
-        connect(doc, &QTextDocument::undoAvailable, this, &Qwenpad::detectLanguage);
+
+        if (!detectLanguageTimer) {
+            detectLanguageTimer = new QTimer(this);
+            detectLanguageTimer->setSingleShot(true);
+            connect(detectLanguageTimer, &QTimer::timeout, this, &Qwenpad::detectLanguage);
+        }
+        connect(doc, &QTextDocument::undoAvailable, this, [this]() {
+            detectLanguageTimer->start(500);
+        });
 
         undoAction->setEnabled(doc->isUndoAvailable());
         redoAction->setEnabled(doc->isRedoAvailable());

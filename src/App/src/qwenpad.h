@@ -13,6 +13,7 @@
 #include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QKeySequence>
+#include <QTimer>
 #include "tabmanager.h"
 
 class SyntaxHighlighter;
@@ -91,6 +92,7 @@ private slots:
     int currentLineEndingType;
     QString currentHighlighterLanguage;
     QFont currentFont;
+    QTimer *detectLanguageTimer;
 
 protected:
     void resizeEvent(QResizeEvent *event) override;

@@ -234,7 +234,7 @@ void SyntaxHighlighter::addJSONRules()
     rule.pattern = stringPattern;
     rules.append(rule);
 
-    QString numberStr = QString("(?:-)?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?");
+    QString numberStr = QString("(?:-)?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?");
     QRegularExpression numberPattern(numberStr);
     rule.format = numberFormat;
     rule.pattern = numberPattern;
@@ -465,22 +465,43 @@ void SyntaxHighlighter::setLanguage(const QString &language)
         QRegularExpression heredocEndPattern("^\\s*(\\w+)\\s*$");
 
         if (inHeredoc) {
-            QTextCharFormat heredocFormat = createCommentFormat(Qt::green);
-            setFormat(0, text.length(), heredocFormat);
-            highlightedRegions.append(qMakePair(0, text.length()));
-
             if (heredocEndPattern.match(text).hasMatch()) {
                 QRegularExpressionMatch match = heredocEndPattern.match(text);
                 QString endMarker = match.captured(1);
                 if (endMarker == heredocMarker) {
-                    if (previousBlock.isValid()) {
-                        auto userData = previousBlock.userData();
-                        if (userData) {
-                            static_cast<ShellHeredocData *>(userData)->marker = "";
-                        }
+                    int markerStart = match.capturedStart();
+                    int markerLength = match.capturedLength();
+                    QTextCharFormat endMarkerFormat = createDefaultFormat(Qt::black);
+                    setFormat(markerStart, markerLength, endMarkerFormat);
+                    highlightedRegions.append(qMakePair(markerStart, markerStart + markerLength));
+
+                    auto userData = currentBlock().userData();
+                    if (userData) {
+                        static_cast<ShellHeredocData *>(userData)->marker = "";
+                    } else {
+                        auto newData = new ShellHeredocData;
+                        newData->marker = "";
+                        currentBlock().setUserData(newData);
+                    }
+                } else {
+                    QTextCharFormat heredocFormat = createCommentFormat(Qt::green);
+                    setFormat(0, text.length(), heredocFormat);
+                    highlightedRegions.append(qMakePair(0, text.length()));
+
+                    auto userData = currentBlock().userData();
+                    if (userData) {
+                        static_cast<ShellHeredocData *>(userData)->marker = heredocMarker;
+                    } else {
+                        auto newData = new ShellHeredocData;
+                        newData->marker = heredocMarker;
+                        currentBlock().setUserData(newData);
                     }
                 }
             } else {
+                QTextCharFormat heredocFormat = createCommentFormat(Qt::green);
+                setFormat(0, text.length(), heredocFormat);
+                highlightedRegions.append(qMakePair(0, text.length()));
+
                 auto userData = currentBlock().userData();
                 if (userData) {
                     static_cast<ShellHeredocData *>(userData)->marker = heredocMarker;
